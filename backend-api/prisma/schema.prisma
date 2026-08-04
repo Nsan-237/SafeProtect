@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  VICTIM
+  SOCIAL_WORKER
+  ORGANIZATION
+  ADMIN
+}
+
+enum CaseStatus {
+  NEW
+  UNDER_INVESTIGATION
+  SUPPORT_PROVIDED
+  RESOLVED
+  CLOSED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IncidentCategory {
+  PHYSICAL_ABUSE
+  SEXUAL_ABUSE
+  DOMESTIC_VIOLENCE
+  EMOTIONAL_ABUSE
+  NEGLECT
+  OTHER
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  password  String
+  role      Role     @default(VICTIM)
+  avatar    String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  victimProfile       Victim?
+  socialWorkerProfile SocialWorker?
+  organizationProfile Organization?
+
+  sentMessages     Message[]      @relation("SentMessages")
+  receivedMessages Message[]      @relation("ReceivedMessages")
+  notifications    Notification[]
+  auditLogs        AuditLog[]
+  refreshTokens    RefreshToken[]
+}
+
+model Victim {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id])
+  age              Int?
+  gender           String?
+  location         String?
+  emergencyContact String?
+  address          String?
+  incidents        Incident[]
+  appointments     Appointment[]
+}
+
+model SocialWorker {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id])
+  department         String?
+  specialization     String?
+  availability       String?
+  assignedCasesCount Int      @default(0)
+  cases              Case[]
+  appointments       Appointment[]
+}
+
+model Organization {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  name        String
+  type        String?
+  location    String?
+  phone       String?
+  email       String?
+  description String?  @db.Text
+  isVerified  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  services    Service[]
+  appointments Appointment[]
+}
+
+model Incident {
+  id          String           @id @default(uuid())
+  victimId    String
+  victim      Victim           @relation(fields: [victimId], references: [id])
+  category    IncidentCategory
+  description String           @db.Text
+  location    String?
+  date        DateTime
+  riskLevel   RiskLevel
+  evidence    String?
+  isAnonymous Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  cases       Case[]
+}
+
+model Case {
+  id               String       @id @default(uuid())
+  caseNumber       String       @unique
+  incidentId       String
+  incident         Incident     @relation(fields: [incidentId], references: [id])
+  assignedWorkerId String?
+  assignedWorker   SocialWorker? @relation(fields: [assignedWorkerId], references: [id])
+  status           CaseStatus   @default(NEW)
+  priority         RiskLevel    @default(MEDIUM)
+  notes            String?      @db.Text
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+model Appointment {
+  id               String       @id @default(uuid())
+  victimId         String
+  victim           Victim       @relation(fields: [victimId], references: [id])
+  organizationId   String?
+  organization     Organization? @relation(fields: [organizationId], references: [id])
+  socialWorkerId   String?
+  socialWorker     SocialWorker? @relation(fields: [socialWorkerId], references: [id])
+  title            String
+  date             DateTime
+  time             String
+  type             String
+  status           AppointmentStatus @default(SCHEDULED)
+  notes            String?      @db.Text
+  createdAt        DateTime     @default(now())
+}
+
+model Service {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  category       String
+  description    String?      @db.Text
+  isActive       Boolean      @default(true)
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  senderId   String
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id])
+  receiverId String
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  content    String   @db.Text
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  message   String
+  type      String
+  isRead    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String
+  details   String?  @db.Text
+  createdAt DateTime @default(now())
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}

@@ -1,0 +1,16 @@
+{
+  "name": "safeprotect-cameroon",
+  "version": "1.0.0",
+  "description": "SafeProtect Cameroon — Child Protection & GBV Management Platform",
+  "private": true,
+  "workspaces": [
+    "backend-api",
+    "web-dashboard"
+  ],
+  "scripts": {
+    "backend": "cd backend-api && npm run dev",
+    "web": "cd web-dashboard && npm run dev",
+    "mobile": "cd mobile-app && npx expo start",
+    "install:all": "npm install && cd mobile-app && npm install"
+  }
+}
