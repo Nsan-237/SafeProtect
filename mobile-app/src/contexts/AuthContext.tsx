@@ -1,7 +1,7 @@
-import React, { createContext, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User } from '../types';
-import api from '../services/api';
+import React, { createContext, useState, useEffect } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { User } from "../types";
+import api, { setOnAuthFailure } from "../services/api";
 
 interface AuthContextData {
   user: User | null;
@@ -10,64 +10,67 @@ interface AuthContextData {
   logout: () => Promise<void>;
 }
 
-export const AuthContext = createContext<AuthContextData>({} as AuthContextData);
+export const AuthContext = createContext<AuthContextData>(
+  {} as AuthContextData,
+);
 
-export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setOnAuthFailure(() => {
+      setUser(null);
+      AsyncStorage.removeItem("@user");
+      AsyncStorage.removeItem("@token");
+      AsyncStorage.removeItem("@refreshToken");
+    });
+
     const loadUser = async () => {
       try {
-        const storedUser = await AsyncStorage.getItem('@user');
-        if (storedUser) setUser(JSON.parse(storedUser));
+        const [storedUser, storedToken] = await Promise.all([
+          AsyncStorage.getItem("@user"),
+          AsyncStorage.getItem("@token"),
+        ]);
+
+        if (storedUser && storedToken) {
+          setUser(JSON.parse(storedUser));
+        } else {
+          await AsyncStorage.removeItem("@user");
+          await AsyncStorage.removeItem("@token");
+          await AsyncStorage.removeItem("@refreshToken");
+        }
       } catch (err) {
-        console.error('Failed to load user state', err);
+        console.error("Failed to load user state", err);
       } finally {
         setLoading(false);
       }
     };
     loadUser();
-
-    // Auto-logout on 401 Unauthorized response
-    const interceptor = api.interceptors.response.use(
-      (response) => response,
-      async (error) => {
-        if (error.response?.status === 401) {
-          setUser(null);
-          await AsyncStorage.removeItem('@user');
-          await AsyncStorage.removeItem('@token');
-          await AsyncStorage.removeItem('@refreshToken');
-        }
-        return Promise.reject(error);
-      }
-    );
-
-    return () => {
-      api.interceptors.response.eject(interceptor);
-    };
   }, []);
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await api.post('/auth/login', { email, password });
+      const response = await api.post("/auth/login", { email, password });
       const { user: loggedInUser, tokens } = response.data;
-      
+
       setUser(loggedInUser);
-      await AsyncStorage.setItem('@user', JSON.stringify(loggedInUser));
-      await AsyncStorage.setItem('@token', tokens.accessToken);
-      await AsyncStorage.setItem('@refreshToken', tokens.refreshToken);
+      await AsyncStorage.setItem("@user", JSON.stringify(loggedInUser));
+      await AsyncStorage.setItem("@token", tokens.accessToken);
+      await AsyncStorage.setItem("@refreshToken", tokens.refreshToken);
     } catch (error: any) {
-      const errMsg = error.response?.data?.error || 'Authentication failed';
+      const errMsg = error.response?.data?.error || "Authentication failed";
       throw new Error(errMsg);
     }
   };
 
   const logout = async () => {
     setUser(null);
-    await AsyncStorage.removeItem('@user');
-    await AsyncStorage.removeItem('@token');
-    await AsyncStorage.removeItem('@refreshToken');
+    await AsyncStorage.removeItem("@user");
+    await AsyncStorage.removeItem("@token");
+    await AsyncStorage.removeItem("@refreshToken");
   };
 
   return (

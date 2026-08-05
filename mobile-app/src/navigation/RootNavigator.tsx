@@ -1,20 +1,22 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
-import { useAuth } from '../hooks/useAuth';
-import { AuthStack } from './AuthStack';
-import { VictimTabs } from './VictimTabs';
-import { SocialWorkerTabs } from './SocialWorkerTabs';
-import { CaseDetailScreen } from '../screens/victim/CaseDetailScreen';
-import { ReportIncidentScreen } from '../screens/victim/ReportIncidentScreen';
-import { SWCaseDetailScreen } from '../screens/socialworker/SWCaseDetailScreen';
-import { View, ActivityIndicator } from 'react-native';
+import React from "react";
+import { NavigationContainer } from "@react-navigation/native";
+import { createStackNavigator } from "@react-navigation/stack";
+import { useAuth } from "../hooks/useAuth";
+import { AuthStack } from "./AuthStack";
+import { VictimTabs } from "./VictimTabs";
+import { SocialWorkerTabs } from "./SocialWorkerTabs";
+import { CaseDetailScreen } from "../screens/victim/CaseDetailScreen";
+import { ReportIncidentScreen } from "../screens/victim/ReportIncidentScreen";
+import { ChatScreen } from "../screens/victim/ChatScreen";
+import { SWCaseDetailScreen } from "../screens/socialworker/SWCaseDetailScreen";
+import { View, ActivityIndicator } from "react-native";
 
 const Stack = createStackNavigator();
 
 const VictimStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="VictimTabs" component={VictimTabs} />
+    <Stack.Screen name="Chat" component={ChatScreen} />
     <Stack.Screen name="CaseDetail" component={CaseDetailScreen} />
     <Stack.Screen name="ReportIncident" component={ReportIncidentScreen} />
   </Stack.Navigator>
@@ -42,7 +44,7 @@ export const RootNavigator = () => {
     <NavigationContainer>
       {!user ? (
         <AuthStack />
-      ) : user.role === 'VICTIM' ? (
+      ) : user.role === "VICTIM" ? (
         <VictimStack />
       ) : (
         <SocialWorkerStack />

@@ -1,11 +1,11 @@
-import React from 'react';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { HomeScreen } from '../screens/victim/HomeScreen';
-import { CaseListScreen } from '../screens/victim/CaseListScreen';
-import { EmergencySOSScreen } from '../screens/victim/EmergencySOSScreen';
-import { ServicesScreen } from '../screens/victim/ServicesScreen';
-import { ProfileScreen } from '../screens/victim/ProfileScreen';
-import { CustomTabBar } from '../components/shared/CustomTabBar';
+import React from "react";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { HomeScreen } from "../screens/victim/HomeScreen";
+import { CaseListScreen } from "../screens/victim/CaseListScreen";
+import { EmergencySOSScreen } from "../screens/victim/EmergencySOSScreen";
+import { ServicesScreen } from "../screens/victim/ServicesScreen";
+import { ProfileScreen } from "../screens/victim/ProfileScreen";
+import { CustomTabBar } from "../components/shared/CustomTabBar";
 
 const Tab = createBottomTabNavigator();
 
