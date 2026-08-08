@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,12 +9,22 @@ import {
   StatusBar,
   ActivityIndicator,
   Alert,
+  StyleSheet,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { CategoryCard } from "../../components/shared/CategoryCard";
 import { useAuth } from "../../hooks/useAuth";
 import api from "../../services/api";
+import MapView, { Marker, Region } from "react-native-maps";
+import * as Location from "expo-location";
+
+const YAOUNDE_COORD = {
+  latitude: 3.848,
+  longitude: 11.5021,
+  latitudeDelta: 0.05,
+  longitudeDelta: 0.05,
+};
 
 export const ReportIncidentScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
@@ -25,6 +35,10 @@ export const ReportIncidentScreen = ({ navigation }: any) => {
   const [location, setLocation] = useState("Yaoundé, Mfoundi");
   const [riskLevel, setRiskLevel] = useState("High");
   const [loading, setLoading] = useState(false);
+  
+  // Map specific state
+  const [mapRegion, setMapRegion] = useState<Region>(YAOUNDE_COORD);
+  const [markerCoord, setMarkerCoord] = useState(YAOUNDE_COORD);
 
   const categories = [
     { title: "Physical Abuse", icon: "hand-left" },
@@ -37,42 +51,65 @@ export const ReportIncidentScreen = ({ navigation }: any) => {
 
   const mapCategory = (cat: string) => {
     switch (cat) {
-      case "Physical Abuse":
-        return "PHYSICAL_ABUSE";
-      case "Sexual Abuse":
-        return "SEXUAL_ABUSE";
-      case "Domestic Violence":
-        return "DOMESTIC_VIOLENCE";
-      case "Emotional Abuse":
-        return "EMOTIONAL_ABUSE";
-      case "Neglect":
-        return "NEGLECT";
-      default:
-        return "OTHER";
+      case "Physical Abuse": return "PHYSICAL_ABUSE";
+      case "Sexual Abuse": return "SEXUAL_ABUSE";
+      case "Domestic Violence": return "DOMESTIC_VIOLENCE";
+      case "Emotional Abuse": return "EMOTIONAL_ABUSE";
+      case "Neglect": return "NEGLECT";
+      default: return "OTHER";
     }
   };
 
   const mapRiskLevel = (lvl: string) => {
     switch (lvl) {
-      case "Low":
-        return "LOW";
-      case "Medium":
-        return "MEDIUM";
-      case "High":
-        return "HIGH";
-      case "Critical":
-        return "CRITICAL";
-      default:
-        return "HIGH";
+      case "Low": return "LOW";
+      case "Medium": return "MEDIUM";
+      case "High": return "HIGH";
+      case "Critical": return "CRITICAL";
+      default: return "HIGH";
     }
   };
 
+  // Request location permissions and grab current location
+  useEffect(() => {
+    if (step === 2) {
+      (async () => {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          return;
+        }
+        try {
+          let loc = await Location.getCurrentPositionAsync({});
+          const newRegion = {
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+            latitudeDelta: 0.02,
+            longitudeDelta: 0.02,
+          };
+          setMapRegion(newRegion);
+          setMarkerCoord(newRegion);
+          
+          // Try reverse geocoding
+          let address = await Location.reverseGeocodeAsync({
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude
+          });
+          
+          if (address.length > 0) {
+            const add = address[0];
+            const locString = [add.street, add.city, add.region].filter(Boolean).join(", ");
+            if (locString) setLocation(locString);
+          }
+        } catch (err) {
+          console.warn("Could not fetch location", err);
+        }
+      })();
+    }
+  }, [step]);
+
   const handleNext = () => {
     if (step === 1 && !category) {
-      Alert.alert(
-        "Required",
-        "Please select a category of incident to continue.",
-      );
+      Alert.alert("Required", "Please select a category of incident to continue.");
       return;
     }
     if (step < 4) {
@@ -85,17 +122,20 @@ export const ReportIncidentScreen = ({ navigation }: any) => {
   const handleSubmit = async () => {
     try {
       setLoading(true);
+      // Combine manual text location with GPS coords if available
+      const finalLocation = `${location} (Lat: ${markerCoord.latitude.toFixed(4)}, Lng: ${markerCoord.longitude.toFixed(4)})`;
+
       const res = await api.post("/incidents", {
         victimId: user?.victimProfile?.id || undefined,
         category: mapCategory(category),
         description: details || `Reported ${category} incident at ${location}`,
-        location: location || null,
+        location: finalLocation,
         date: new Date().toISOString(),
         riskLevel: mapRiskLevel(riskLevel),
         isAnonymous: false,
       });
 
-      const caseNum = res.data?.case?.caseNumber || "SPC-2026-00002";
+      const caseNum = res.data?.case?.caseNumber || "SPC-UNKNOWN";
 
       Alert.alert(
         "✅ Report Submitted",
@@ -108,8 +148,7 @@ export const ReportIncidentScreen = ({ navigation }: any) => {
         ],
       );
     } catch (error: any) {
-      const errMsg =
-        error.response?.data?.error || "Failed to submit incident report.";
+      const errMsg = error.response?.data?.error || "Failed to submit incident report.";
       Alert.alert("Error", errMsg);
     } finally {
       setLoading(false);
@@ -118,7 +157,7 @@ export const ReportIncidentScreen = ({ navigation }: any) => {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FE" }}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F8F9FE" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Header Bar */}
       <View
@@ -140,34 +179,15 @@ export const ReportIncidentScreen = ({ navigation }: any) => {
         >
           <Ionicons name="arrow-back" size={24} color="#1E1E2D" />
         </TouchableOpacity>
-        <Text
-          style={{
-            fontSize: 18,
-            fontWeight: "800",
-            color: "#1E1E2D",
-            marginLeft: 12,
-          }}
-        >
+        <Text style={{ fontSize: 18, fontWeight: "800", color: "#1E1E2D", marginLeft: 12 }}>
           Report an Incident
         </Text>
       </View>
 
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
-      >
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
         {/* Step Progress Label */}
         <View style={{ marginBottom: 20 }}>
-          <Text
-            style={{
-              fontSize: 11,
-              fontWeight: "700",
-              color: "#75759E",
-              textTransform: "uppercase",
-              letterSpacing: 0.6,
-              marginBottom: 8,
-            }}
-          >
+          <Text style={{ fontSize: 11, fontWeight: "700", color: "#75759E", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>
             Step {step} of 4
           </Text>
           <View style={{ flexDirection: "row", gap: 6 }}>
@@ -188,27 +208,14 @@ export const ReportIncidentScreen = ({ navigation }: any) => {
         {/* Step 1: Category Grid */}
         {step === 1 && (
           <View>
-            <Text
-              style={{
-                fontSize: 22,
-                fontWeight: "800",
-                color: "#1E1E2D",
-                marginBottom: 4,
-              }}
-            >
+            <Text style={{ fontSize: 22, fontWeight: "800", color: "#1E1E2D", marginBottom: 4 }}>
               What happened?
             </Text>
             <Text style={{ fontSize: 13, color: "#75759E", marginBottom: 20 }}>
               Please select the type of incident
             </Text>
 
-            <View
-              style={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-                justifyContent: "space-between",
-              }}
-            >
+            <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" }}>
               {categories.map((c) => (
                 <View key={c.title} style={{ width: "48%", marginBottom: 14 }}>
                   <CategoryCard
@@ -226,29 +233,14 @@ export const ReportIncidentScreen = ({ navigation }: any) => {
         {/* Step 2: Incident Details */}
         {step === 2 && (
           <View>
-            <Text
-              style={{
-                fontSize: 22,
-                fontWeight: "800",
-                color: "#1E1E2D",
-                marginBottom: 4,
-              }}
-            >
-              Incident Details
+            <Text style={{ fontSize: 22, fontWeight: "800", color: "#1E1E2D", marginBottom: 4 }}>
+              Incident Details & Location
             </Text>
             <Text style={{ fontSize: 13, color: "#75759E", marginBottom: 20 }}>
-              Describe what happened as detailed as possible
+              Describe what happened and pinpoint the location
             </Text>
 
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "700",
-                color: "#75759E",
-                textTransform: "uppercase",
-                marginBottom: 6,
-              }}
-            >
+            <Text style={{ fontSize: 11, fontWeight: "700", color: "#75759E", textTransform: "uppercase", marginBottom: 6 }}>
               Description
             </Text>
             <TextInput
@@ -260,7 +252,7 @@ export const ReportIncidentScreen = ({ navigation }: any) => {
                 borderColor: "#E8E8F0",
                 fontSize: 15,
                 color: "#1E1E2D",
-                minHeight: 120,
+                minHeight: 100,
                 marginBottom: 16,
               }}
               placeholder="Provide details about the incident..."
@@ -271,16 +263,8 @@ export const ReportIncidentScreen = ({ navigation }: any) => {
               onChangeText={setDetails}
             />
 
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "700",
-                color: "#75759E",
-                textTransform: "uppercase",
-                marginBottom: 6,
-              }}
-            >
-              Location
+            <Text style={{ fontSize: 11, fontWeight: "700", color: "#75759E", textTransform: "uppercase", marginBottom: 6 }}>
+              Location Address
             </Text>
             <View
               style={{
@@ -291,41 +275,55 @@ export const ReportIncidentScreen = ({ navigation }: any) => {
                 flexDirection: "row",
                 alignItems: "center",
                 paddingHorizontal: 14,
+                marginBottom: 16,
               }}
             >
-              <Ionicons
-                name="location-outline"
-                size={18}
-                color="#75759E"
-                style={{ marginRight: 10 }}
-              />
+              <Ionicons name="location-outline" size={18} color="#75759E" style={{ marginRight: 10 }} />
               <TextInput
-                style={{
-                  flex: 1,
-                  paddingVertical: 14,
-                  fontSize: 15,
-                  color: "#1E1E2D",
-                }}
+                style={{ flex: 1, paddingVertical: 14, fontSize: 15, color: "#1E1E2D" }}
                 placeholder="City, District, Region"
                 placeholderTextColor="#B0B0C8"
                 value={location}
                 onChangeText={setLocation}
               />
             </View>
+
+            <Text style={{ fontSize: 11, fontWeight: "700", color: "#75759E", textTransform: "uppercase", marginBottom: 6 }}>
+              Pinpoint on Map
+            </Text>
+            <View style={{ height: 200, borderRadius: 14, overflow: 'hidden', borderWidth: 1.5, borderColor: '#E8E8F0' }}>
+              <MapView
+                style={StyleSheet.absoluteFillObject}
+                region={mapRegion}
+                onRegionChangeComplete={(r) => setMapRegion(r)}
+                onPress={(e) => setMarkerCoord({
+                  ...markerCoord,
+                  latitude: e.nativeEvent.coordinate.latitude,
+                  longitude: e.nativeEvent.coordinate.longitude
+                })}
+              >
+                <Marker
+                  coordinate={markerCoord}
+                  title="Incident Location"
+                  draggable
+                  onDragEnd={(e) => setMarkerCoord({
+                    ...markerCoord,
+                    latitude: e.nativeEvent.coordinate.latitude,
+                    longitude: e.nativeEvent.coordinate.longitude
+                  })}
+                />
+              </MapView>
+            </View>
+            <Text style={{ fontSize: 11, color: "#75759E", marginTop: 6, textAlign: 'center' }}>
+              Tap or drag the marker to adjust the exact location.
+            </Text>
           </View>
         )}
 
         {/* Step 3: Risk Level */}
         {step === 3 && (
           <View>
-            <Text
-              style={{
-                fontSize: 22,
-                fontWeight: "800",
-                color: "#1E1E2D",
-                marginBottom: 4,
-              }}
-            >
+            <Text style={{ fontSize: 22, fontWeight: "800", color: "#1E1E2D", marginBottom: 4 }}>
               Risk Level
             </Text>
             <Text style={{ fontSize: 13, color: "#75759E", marginBottom: 20 }}>
@@ -351,22 +349,10 @@ export const ReportIncidentScreen = ({ navigation }: any) => {
                     justifyContent: "space-between",
                   }}
                 >
-                  <Text
-                    style={{
-                      fontSize: 16,
-                      fontWeight: "800",
-                      color: isSel ? "#5B3FD3" : "#1E1E2D",
-                    }}
-                  >
+                  <Text style={{ fontSize: 16, fontWeight: "800", color: isSel ? "#5B3FD3" : "#1E1E2D" }}>
                     {level} Urgency
                   </Text>
-                  {isSel && (
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={22}
-                      color="#5B3FD3"
-                    />
-                  )}
+                  {isSel && <Ionicons name="checkmark-circle" size={22} color="#5B3FD3" />}
                 </TouchableOpacity>
               );
             })}
@@ -376,113 +362,34 @@ export const ReportIncidentScreen = ({ navigation }: any) => {
         {/* Step 4: Review & Submit */}
         {step === 4 && (
           <View>
-            <Text
-              style={{
-                fontSize: 22,
-                fontWeight: "800",
-                color: "#1E1E2D",
-                marginBottom: 4,
-              }}
-            >
+            <Text style={{ fontSize: 22, fontWeight: "800", color: "#1E1E2D", marginBottom: 4 }}>
               Review & Submit
             </Text>
             <Text style={{ fontSize: 13, color: "#75759E", marginBottom: 20 }}>
               Confirm your report details before submitting
             </Text>
 
-            <View
-              style={{
-                backgroundColor: "#FFFFFF",
-                borderRadius: 16,
-                padding: 20,
-                borderWidth: 1,
-                borderColor: "#F0F0F5",
-                marginBottom: 20,
-              }}
-            >
+            <View style={{ backgroundColor: "#FFFFFF", borderRadius: 16, padding: 20, borderWidth: 1, borderColor: "#F0F0F5", marginBottom: 20 }}>
               <View style={{ marginBottom: 14 }}>
-                <Text
-                  style={{
-                    fontSize: 11,
-                    fontWeight: "700",
-                    color: "#75759E",
-                    textTransform: "uppercase",
-                    marginBottom: 2,
-                  }}
-                >
-                  Category
-                </Text>
-                <Text
-                  style={{ fontSize: 16, fontWeight: "800", color: "#1E1E2D" }}
-                >
-                  {category}
-                </Text>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: "#75759E", textTransform: "uppercase", marginBottom: 2 }}>Category</Text>
+                <Text style={{ fontSize: 16, fontWeight: "800", color: "#1E1E2D" }}>{category}</Text>
               </View>
 
               <View style={{ marginBottom: 14 }}>
-                <Text
-                  style={{
-                    fontSize: 11,
-                    fontWeight: "700",
-                    color: "#75759E",
-                    textTransform: "uppercase",
-                    marginBottom: 2,
-                  }}
-                >
-                  Details
-                </Text>
-                <Text style={{ fontSize: 14, color: "#1E1E2D" }}>
-                  {details || "No additional details specified."}
-                </Text>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: "#75759E", textTransform: "uppercase", marginBottom: 2 }}>Details</Text>
+                <Text style={{ fontSize: 14, color: "#1E1E2D" }}>{details || "No additional details specified."}</Text>
               </View>
 
               <View style={{ marginBottom: 14 }}>
-                <Text
-                  style={{
-                    fontSize: 11,
-                    fontWeight: "700",
-                    color: "#75759E",
-                    textTransform: "uppercase",
-                    marginBottom: 2,
-                  }}
-                >
-                  Location
-                </Text>
-                <Text style={{ fontSize: 14, color: "#1E1E2D" }}>
-                  {location}
-                </Text>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: "#75759E", textTransform: "uppercase", marginBottom: 2 }}>Location</Text>
+                <Text style={{ fontSize: 14, color: "#1E1E2D" }}>{location}</Text>
+                <Text style={{ fontSize: 12, color: "#75759E", marginTop: 2 }}>Lat: {markerCoord.latitude.toFixed(4)}, Lng: {markerCoord.longitude.toFixed(4)}</Text>
               </View>
 
               <View>
-                <Text
-                  style={{
-                    fontSize: 11,
-                    fontWeight: "700",
-                    color: "#75759E",
-                    textTransform: "uppercase",
-                    marginBottom: 4,
-                  }}
-                >
-                  Risk Level
-                </Text>
-                <View
-                  style={{
-                    backgroundColor: "#FFF0F3",
-                    paddingHorizontal: 12,
-                    paddingVertical: 4,
-                    borderRadius: 12,
-                    alignSelf: "flex-start",
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: "#FF2E55",
-                      fontSize: 12,
-                      fontWeight: "800",
-                    }}
-                  >
-                    {riskLevel} Priority
-                  </Text>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: "#75759E", textTransform: "uppercase", marginBottom: 4 }}>Risk Level</Text>
+                <View style={{ backgroundColor: "#FFF0F3", paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, alignSelf: "flex-start" }}>
+                  <Text style={{ color: "#FF2E55", fontSize: 12, fontWeight: "800" }}>{riskLevel} Priority</Text>
                 </View>
               </View>
             </View>
@@ -509,19 +416,9 @@ export const ReportIncidentScreen = ({ navigation }: any) => {
               elevation: 6,
             }}
           >
-            {loading ? (
-              <ActivityIndicator
-                size="small"
-                color="#FFF"
-                style={{ marginRight: 8 }}
-              />
-            ) : null}
+            {loading && <ActivityIndicator size="small" color="#FFF" style={{ marginRight: 8 }} />}
             <Text style={{ color: "#FFFFFF", fontWeight: "800", fontSize: 16 }}>
-              {step === 4
-                ? loading
-                  ? "Submitting Report..."
-                  : "Submit Report"
-                : "Next"}
+              {step === 4 ? (loading ? "Submitting Report..." : "Submit Report") : "Next"}
             </Text>
           </TouchableOpacity>
         </View>

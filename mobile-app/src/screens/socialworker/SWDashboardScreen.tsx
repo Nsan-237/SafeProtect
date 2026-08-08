@@ -66,6 +66,21 @@ export const SWDashboardScreen = ({ navigation }: any) => {
         ? allCases.filter((c: any) => c.assignedWorkerId === swId)
         : allCases;
 
+      const mapPriority = (priority: string) => {
+        switch (priority) {
+          case "LOW":
+            return "Low" as const;
+          case "MEDIUM":
+            return "Medium" as const;
+          case "HIGH":
+            return "High" as const;
+          case "CRITICAL":
+            return "Critical" as const;
+          default:
+            return "High" as const;
+        }
+      };
+
       const mapped = filteredCases.map(
         (c: any): Case => ({
           id: c.id,
@@ -78,7 +93,7 @@ export const SWDashboardScreen = ({ navigation }: any) => {
           ),
           location: c.incident?.location || "Yaoundé",
           description: c.incident?.description || "",
-          riskLevel: c.riskLevel || "High",
+          riskLevel: mapPriority(c.priority),
           victimId: c.incident?.victimId || "",
         }),
       );

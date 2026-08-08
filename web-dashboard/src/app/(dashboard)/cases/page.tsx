@@ -1,46 +1,123 @@
-"use client";
+'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { mockCases } from '@/lib/mock-data';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { FolderOpen, Search, UserCheck, ChevronRight } from 'lucide-react';
+import api from '@/lib/api';
+import { Search, UserCheck } from 'lucide-react';
+
+type ApiCase = {
+  id: string;
+  caseNumber: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  status: 'NEW' | 'UNDER_INVESTIGATION' | 'SUPPORT_PROVIDED' | 'RESOLVED' | 'CLOSED';
+  assignedWorkerId: string | null;
+  assignedWorker: { user: { name: string } } | null;
+  incident: {
+    category: string;
+    location: string | null;
+    victim: { user: { name: string } };
+  };
+};
+
+type SocialWorker = {
+  id: string;
+  user: { name: string };
+};
+
+const label = (value: string) => value.replaceAll('_', ' ');
 
 export default function CasesPage() {
+  const [cases, setCases] = useState<ApiCase[]>([]);
+  const [workers, setWorkers] = useState<SocialWorker[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [savingCaseId, setSavingCaseId] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
-  const filteredCases = mockCases.filter(
-    (c) =>
-      c.caseNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.assignedTo.toLowerCase().includes(searchTerm.toLowerCase())
+  const loadCases = useCallback(async () => {
+    try {
+      setError('');
+      const [caseResponse, workerResponse] = await Promise.all([
+        api.get<ApiCase[]>('/cases'),
+        api.get<SocialWorker[]>('/social-workers'),
+      ]);
+      setCases(caseResponse.data);
+      setWorkers(workerResponse.data);
+    } catch (requestError: any) {
+      setError(requestError.response?.data?.error || 'Unable to load case data.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCases();
+  }, [loadCases]);
+
+  const updateAssignment = async (caseId: string, workerId: string) => {
+    if (!workerId) return;
+
+    try {
+      setSavingCaseId(caseId);
+      setError('');
+      await api.put(`/cases/${caseId}/assign`, { workerId });
+      await loadCases();
+    } catch (requestError: any) {
+      setError(requestError.response?.data?.error || 'Unable to assign the case.');
+    } finally {
+      setSavingCaseId(null);
+    }
+  };
+
+  const updateStatus = async (caseId: string, status: ApiCase['status']) => {
+    try {
+      setSavingCaseId(caseId);
+      setError('');
+      await api.patch(`/cases/${caseId}`, { status });
+      await loadCases();
+    } catch (requestError: any) {
+      setError(requestError.response?.data?.error || 'Unable to update the case status.');
+    } finally {
+      setSavingCaseId(null);
+    }
+  };
+
+  const filteredCases = useMemo(
+    () =>
+      cases.filter((caseItem) => {
+        const query = searchTerm.toLowerCase();
+        return (
+          caseItem.caseNumber.toLowerCase().includes(query) ||
+          label(caseItem.incident.category).toLowerCase().includes(query) ||
+          caseItem.incident.victim.user.name.toLowerCase().includes(query) ||
+          (caseItem.assignedWorker?.user.name.toLowerCase().includes(query) ?? false)
+        );
+      }),
+    [cases, searchTerm],
   );
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Case Management</h1>
-          <p className="text-gray-500 text-sm">Assign social workers, track case progress, and update protection milestones.</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Case Management</h1>
+        <p className="text-gray-500 text-sm">Assign social workers and update active protection cases.</p>
       </div>
+
+      {error ? <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
 
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="relative w-full sm:w-80">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search case #, title, or worker..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#5B3FD3]"
-              />
-            </div>
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search case, report, victim, or worker..."
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              className="w-full rounded-lg border py-2 pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#5B3FD3]"
+            />
           </div>
         </CardHeader>
         <CardContent>
@@ -49,43 +126,59 @@ export default function CasesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Case Number</TableHead>
-                  <TableHead>Title / Incident</TableHead>
+                  <TableHead>Incident</TableHead>
                   <TableHead>Victim</TableHead>
                   <TableHead>Priority</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Assigned Social Worker</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
+                  <TableHead>Social Worker</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCases.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-mono font-semibold text-[#5B3FD3]">{c.caseNumber}</TableCell>
-                    <TableCell>
-                      <div className="font-medium text-gray-900">{c.title}</div>
-                      <div className="text-xs text-gray-500">{c.location}</div>
-                    </TableCell>
-                    <TableCell className="text-gray-700 font-medium">{c.victimName}</TableCell>
-                    <TableCell>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800">
-                        {c.priority}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className="bg-amber-500 hover:bg-amber-600 text-white">{c.status}</Badge>
-                    </TableCell>
-                    <TableCell className="text-gray-800 font-medium flex items-center gap-2 py-4">
-                      <UserCheck className="h-4 w-4 text-[#5B3FD3]" /> {c.assignedTo}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Link href={`/cases/${c.id}`}>
-                        <Button variant="outline" size="sm" className="gap-1 text-xs">
-                          Manage <ChevronRight className="h-3 w-3" />
-                        </Button>
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {loading ? (
+                  <TableRow><TableCell colSpan={6} className="py-8 text-center text-gray-500">Loading casesâ€¦</TableCell></TableRow>
+                ) : filteredCases.length === 0 ? (
+                  <TableRow><TableCell colSpan={6} className="py-8 text-center text-gray-500">No cases found.</TableCell></TableRow>
+                ) : (
+                  filteredCases.map((caseItem) => (
+                    <TableRow key={caseItem.id}>
+                      <TableCell className="font-mono font-semibold text-[#5B3FD3]">{caseItem.caseNumber}</TableCell>
+                      <TableCell>
+                        <div className="font-medium text-gray-900">{label(caseItem.incident.category)}</div>
+                        <div className="text-xs text-gray-500">{caseItem.incident.location || 'Location not provided'}</div>
+                      </TableCell>
+                      <TableCell className="text-gray-700">{caseItem.incident.victim.user.name}</TableCell>
+                      <TableCell><Badge className="bg-red-100 text-red-800 hover:bg-red-100">{label(caseItem.priority)}</Badge></TableCell>
+                      <TableCell>
+                        <select
+                          value={caseItem.status}
+                          disabled={savingCaseId === caseItem.id}
+                          onChange={(event) => updateStatus(caseItem.id, event.target.value as ApiCase['status'])}
+                          className="rounded-md border bg-white px-2 py-1 text-xs font-medium"
+                        >
+                          <option value="NEW">New</option>
+                          <option value="UNDER_INVESTIGATION">Under Investigation</option>
+                          <option value="SUPPORT_PROVIDED">Support Provided</option>
+                          <option value="RESOLVED">Resolved</option>
+                          <option value="CLOSED">Closed</option>
+                        </select>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex min-w-52 items-center gap-2">
+                          <UserCheck className="h-4 w-4 shrink-0 text-[#5B3FD3]" />
+                          <select
+                            value={caseItem.assignedWorkerId || ''}
+                            disabled={savingCaseId === caseItem.id}
+                            onChange={(event) => updateAssignment(caseItem.id, event.target.value)}
+                            className="w-full rounded-md border bg-white px-2 py-1 text-xs"
+                          >
+                            <option value="">Unassigned</option>
+                            {workers.map((worker) => <option key={worker.id} value={worker.id}>{worker.user.name}</option>)}
+                          </select>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import prisma from '../config/database';
 import { hashPassword, comparePassword } from '../utils/password';
 import { generateTokens, verifyRefreshToken } from '../utils/token';
+import { Role } from '@prisma/client';
 
 // Helper to strip sensitive fields from user object
 const sanitizeUser = (user: any) => {
@@ -11,7 +12,10 @@ const sanitizeUser = (user: any) => {
 
 export const register = async (req: Request, res: Response) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, phone, password } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Name, email, and password are required' });
+    }
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return res.status(400).json({ error: 'Email already in use' });
 
@@ -20,10 +24,10 @@ export const register = async (req: Request, res: Response) => {
       data: {
         name,
         email,
+        phone: phone || null,
         password: hashedPassword,
-        role,
-        ...(role === 'VICTIM' ? { victimProfile: { create: {} } } : {}),
-        ...(role === 'SOCIAL_WORKER' ? { socialWorkerProfile: { create: {} } } : {}),
+        role: Role.VICTIM,
+        victimProfile: { create: {} },
       },
       include: {
         victimProfile: true,

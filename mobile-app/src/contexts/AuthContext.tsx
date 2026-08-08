@@ -1,76 +1,69 @@
-import React, { createContext, useState, useEffect } from "react";
+import React, { createContext, useState, useEffect, ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { User } from "../types";
 import api, { setOnAuthFailure } from "../services/api";
+import { User } from "../types";
 
-interface AuthContextData {
+export interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
-export const AuthContext = createContext<AuthContextData>(
-  {} as AuthContextData,
-);
+export const AuthContext = createContext<AuthContextType>({
+  user: null,
+  loading: true,
+  login: async () => {},
+  logout: async () => {},
+});
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    setOnAuthFailure(() => {
+  const logout = async () => {
+    try {
+      await AsyncStorage.multiRemove(["@user", "@token", "@refreshToken"]);
+    } catch (e) {
+      console.error("Error clearing auth storage:", e);
+    } finally {
       setUser(null);
-      AsyncStorage.removeItem("@user");
-      AsyncStorage.removeItem("@token");
-      AsyncStorage.removeItem("@refreshToken");
+    }
+  };
+
+  useEffect(() => {
+    // Register auto logout callback for API auth failures
+    setOnAuthFailure(() => {
+      logout();
     });
 
-    const loadUser = async () => {
+    // Check stored user session on launch
+    const loadStoredAuth = async () => {
       try {
-        const [storedUser, storedToken] = await Promise.all([
-          AsyncStorage.getItem("@user"),
-          AsyncStorage.getItem("@token"),
-        ]);
-
+        const storedUser = await AsyncStorage.getItem("@user");
+        const storedToken = await AsyncStorage.getItem("@token");
         if (storedUser && storedToken) {
           setUser(JSON.parse(storedUser));
-        } else {
-          await AsyncStorage.removeItem("@user");
-          await AsyncStorage.removeItem("@token");
-          await AsyncStorage.removeItem("@refreshToken");
         }
-      } catch (err) {
-        console.error("Failed to load user state", err);
+      } catch (error) {
+        console.error("Failed to load stored auth session:", error);
       } finally {
         setLoading(false);
       }
     };
-    loadUser();
+
+    loadStoredAuth();
   }, []);
 
   const login = async (email: string, password: string) => {
-    try {
-      const response = await api.post("/auth/login", { email, password });
-      const { user: loggedInUser, tokens } = response.data;
+    const res = await api.post("/auth/login", { email, password });
+    const { user: userData, tokens } = res.data;
 
-      setUser(loggedInUser);
-      await AsyncStorage.setItem("@user", JSON.stringify(loggedInUser));
-      await AsyncStorage.setItem("@token", tokens.accessToken);
-      await AsyncStorage.setItem("@refreshToken", tokens.refreshToken);
-    } catch (error: any) {
-      const errMsg = error.response?.data?.error || "Authentication failed";
-      throw new Error(errMsg);
-    }
-  };
+    await AsyncStorage.setItem("@token", tokens.accessToken);
+    await AsyncStorage.setItem("@refreshToken", tokens.refreshToken);
+    await AsyncStorage.setItem("@user", JSON.stringify(userData));
 
-  const logout = async () => {
-    setUser(null);
-    await AsyncStorage.removeItem("@user");
-    await AsyncStorage.removeItem("@token");
-    await AsyncStorage.removeItem("@refreshToken");
+    setUser(userData);
   };
 
   return (

@@ -8,8 +8,8 @@ const router = Router();
 
 router.use(authenticate);
 router.get('/', authorize([Role.ADMIN]), usersController.getAll);
-router.get('/:id', usersController.getById);
-router.put('/:id', usersController.update);
+router.get('/:id', authorize([Role.ADMIN]), usersController.getById);
+router.put('/:id', authorize([Role.ADMIN]), usersController.update);
 router.delete('/:id', authorize([Role.ADMIN]), usersController.deleteUser);
 
 export default router;

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,126 +6,198 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
+import { useAuth } from "../../hooks/useAuth";
+import api from "../../services/api";
 
-const messagesData = [
-  {
-    id: "1",
-    name: "Aline Ndey",
-    subtitle: "Social Worker",
-    message: "Please remember our meeting...",
-    time: "10:30 AM",
-    unreadCount: 2,
-    icon: "person",
-  },
-  {
-    id: "2",
-    name: "Central Hospital",
-    subtitle: "Medical Team",
-    message: "Your appointment is confirmed...",
-    time: "Yesterday",
-    unreadCount: 0,
-    icon: "medical",
-  },
-  {
-    id: "3",
-    name: "Case Team",
-    subtitle: "3 Members",
-    message: "New update on case CASE-2024-078",
-    time: "Yesterday",
-    unreadCount: 0,
-    icon: "people",
-  },
-  {
-    id: "4",
-    name: "Women's Legal Aid Center",
-    subtitle: "Legal",
-    message: "Please bring the requested documents",
-    time: "2 Days ago",
-    unreadCount: 0,
-    icon: "ribbon",
-  },
-  {
-    id: "5",
-    name: "System",
-    subtitle: "System",
-    message: "Your report INC-2024-125 has been...",
-    time: "3 Days ago",
-    unreadCount: 0,
-    icon: "notifications",
-  },
-];
+interface Thread {
+  id: string;
+  userId: string;
+  name: string;
+  subtitle: string;
+  message: string;
+  time: string;
+  unreadCount: number;
+}
+
+const formatTime = (dateStr: string) => {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays} days ago`;
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+};
 
 export const MessagesScreen = ({ navigation }: any) => {
+  const { user } = useAuth();
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchThreads = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await api.get("/messages/threads");
+      const rawMsgs: any[] = res.data;
+
+      // Group by the "other" person in the conversation
+      const threadMap = new Map<string, Thread>();
+      rawMsgs.forEach((msg: any) => {
+        const isMe = msg.senderId === user?.id;
+        const otherId = isMe ? msg.receiverId : msg.senderId;
+        const otherName = isMe
+          ? msg.receiver?.name ?? "Unknown"
+          : msg.sender?.name ?? "Unknown";
+
+        if (!threadMap.has(otherId)) {
+          threadMap.set(otherId, {
+            id: msg.id,
+            userId: otherId,
+            name: otherName,
+            subtitle: isMe ? "Sent" : "Received",
+            message: msg.content ?? "",
+            time: formatTime(msg.createdAt),
+            unreadCount: !msg.isRead && !isMe ? 1 : 0,
+          });
+        }
+      });
+
+      setThreads(Array.from(threadMap.values()));
+    } catch (err) {
+      console.warn("Error fetching message threads:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchThreads();
+    }, [fetchThreads]),
+  );
+
   return (
-    <SafeAreaView className="flex-1 bg-[#F8F9FE]">
-      <StatusBar barStyle="dark-content" />
-      <View className="flex-row items-center justify-between px-6 pt-4 pb-3 bg-white border-b border-gray-100">
-        <View className="flex-row items-center">
-          <TouchableOpacity
-            onPress={() => navigation?.goBack()}
-            className="p-2 -ml-2"
-          >
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FE" }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+
+      {/* Header */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: 20,
+          paddingVertical: 16,
+          backgroundColor: "#FFFFFF",
+          borderBottomWidth: 1,
+          borderBottomColor: "#F0F0F5",
+        }}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <TouchableOpacity onPress={() => navigation?.goBack()} style={{ padding: 4, marginLeft: -4 }}>
             <Ionicons name="arrow-back" size={24} color="#1E1E2D" />
           </TouchableOpacity>
-          <Text className="text-xl font-bold text-[#1E1E2D] ml-4">
+          <Text style={{ fontSize: 18, fontWeight: "800", color: "#1E1E2D", marginLeft: 12 }}>
             Messages
           </Text>
         </View>
-        <TouchableOpacity className="p-2">
-          <Ionicons name="ellipsis-vertical" size={20} color="#1E1E2D" />
+        <TouchableOpacity style={{ padding: 4 }}>
+          <Ionicons name="create-outline" size={22} color="#5B3FD3" />
         </TouchableOpacity>
       </View>
 
-      <ScrollView className="flex-1">
-        {messagesData.map((chat) => (
-          <TouchableOpacity
-            key={chat.id}
-            onPress={() =>
-              navigation.navigate("Chat", {
-                chatName: chat.name,
-                subtitle: chat.subtitle,
-              })
-            }
-            className="bg-white p-4 border-b border-gray-100 flex-row items-center"
-          >
-            <View className="w-12 h-12 rounded-full bg-[#5B3FD3]/10 items-center justify-center mr-4">
-              <Ionicons name={chat.icon as any} size={22} color="#5B3FD3" />
-            </View>
+      {loading ? (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator size="large" color="#5B3FD3" />
+          <Text style={{ color: "#75759E", marginTop: 12 }}>Loading messages...</Text>
+        </View>
+      ) : threads.length === 0 ? (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <Ionicons name="chatbubbles-outline" size={56} color="#B0B0C8" />
+          <Text style={{ color: "#75759E", fontSize: 16, fontWeight: "600", marginTop: 16 }}>
+            No messages yet
+          </Text>
+          <Text style={{ color: "#B0B0C8", fontSize: 13, marginTop: 6, textAlign: "center", paddingHorizontal: 40 }}>
+            Your social worker or support team will contact you here
+          </Text>
+        </View>
+      ) : (
+        <ScrollView style={{ flex: 1 }}>
+          {threads.map((chat) => (
+            <TouchableOpacity
+              key={chat.id}
+              onPress={() =>
+                navigation.navigate("Chat", {
+                  chatName: chat.name,
+                  subtitle: chat.subtitle,
+                  receiverId: chat.userId,
+                })
+              }
+              style={{
+                backgroundColor: "#FFFFFF",
+                paddingHorizontal: 20,
+                paddingVertical: 14,
+                borderBottomWidth: 1,
+                borderBottomColor: "#F5F5F8",
+                flexDirection: "row",
+                alignItems: "center",
+              }}
+              activeOpacity={0.7}
+            >
+              <View
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
+                  backgroundColor: "#F0EDFF",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginRight: 14,
+                }}
+              >
+                <Text style={{ fontSize: 18, fontWeight: "800", color: "#5B3FD3" }}>
+                  {chat.name.charAt(0).toUpperCase()}
+                </Text>
+              </View>
 
-            <View className="flex-1 mr-2">
-              <View className="flex-row justify-between items-baseline">
-                <View className="flex-row items-center">
-                  <Text className="font-bold text-base text-[#1E1E2D]">
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <Text style={{ fontWeight: "700", fontSize: 15, color: "#1E1E2D" }}>
                     {chat.name}
                   </Text>
-                  <Text className="text-[#75759E] text-xs ml-2 font-medium">
-                    ({chat.subtitle})
-                  </Text>
+                  <Text style={{ color: "#B0B0C8", fontSize: 11 }}>{chat.time}</Text>
                 </View>
-                <Text className="text-[#75759E] text-xs">{chat.time}</Text>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 3 }}>
+                  <Text style={{ color: "#75759E", fontSize: 13, flex: 1, marginRight: 8 }} numberOfLines={1}>
+                    {chat.message}
+                  </Text>
+                  {chat.unreadCount > 0 && (
+                    <View
+                      style={{
+                        width: 20,
+                        height: 20,
+                        backgroundColor: "#5B3FD3",
+                        borderRadius: 10,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Text style={{ color: "#FFFFFF", fontSize: 10, fontWeight: "800" }}>
+                        {chat.unreadCount}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </View>
-
-              <View className="flex-row justify-between items-center mt-1">
-                <Text
-                  className="text-[#75759E] text-sm flex-1 mr-3"
-                  numberOfLines={1}
-                >
-                  {chat.message}
-                </Text>
-                {chat.unreadCount > 0 && (
-                  <View className="w-5 h-5 bg-[#5B3FD3] rounded-full items-center justify-center">
-                    <Text className="text-white text-[10px] font-bold">
-                      {chat.unreadCount}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 };

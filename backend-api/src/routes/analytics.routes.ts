@@ -7,11 +7,13 @@ import { Role } from '@prisma/client';
 const router = Router();
 
 router.use(authenticate);
-router.use(authorize([Role.ADMIN, Role.SOCIAL_WORKER]));
 
+// Dashboard stats accessible to all authenticated users (admins, workers, victims)
 router.get('/dashboard', analyticsController.getDashboardStats);
-router.get('/reports-by-time', analyticsController.getReportsByTime);
-router.get('/reports-by-category', analyticsController.getReportsByCategory);
-router.get('/cases-by-status', analyticsController.getCasesByStatus);
+
+// More detailed analytics only for admin/social-worker
+router.get('/reports-by-time', authorize([Role.ADMIN, Role.SOCIAL_WORKER]), analyticsController.getReportsByTime);
+router.get('/reports-by-category', authorize([Role.ADMIN, Role.SOCIAL_WORKER]), analyticsController.getReportsByCategory);
+router.get('/cases-by-status', authorize([Role.ADMIN, Role.SOCIAL_WORKER]), analyticsController.getCasesByStatus);
 
 export default router;

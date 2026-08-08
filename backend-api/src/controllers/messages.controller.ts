@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import prisma from '../config/database';
 import { AuthRequest } from '../types';
 
+const userSelect = { id: true, name: true, email: true };
+
 export const send = async (req: AuthRequest, res: Response) => {
   try {
     const msg = await prisma.message.create({
@@ -9,7 +11,11 @@ export const send = async (req: AuthRequest, res: Response) => {
         senderId: req.user!.id,
         receiverId: req.body.receiverId,
         content: req.body.content,
-      }
+      },
+      include: {
+        sender: { select: userSelect },
+        receiver: { select: userSelect },
+      },
     });
     res.status(201).json(msg);
   } catch (err) {
@@ -19,14 +25,20 @@ export const send = async (req: AuthRequest, res: Response) => {
 
 export const getThreads = async (req: AuthRequest, res: Response) => {
   try {
+    // Get all messages where this user is either sender or receiver,
+    // ordered by latest first so the client can group them into threads
     const msgs = await prisma.message.findMany({
       where: {
         OR: [
           { senderId: req.user!.id },
           { receiverId: req.user!.id },
-        ]
+        ],
       },
-      distinct: ['senderId', 'receiverId']
+      include: {
+        sender: { select: userSelect },
+        receiver: { select: userSelect },
+      },
+      orderBy: { createdAt: 'desc' },
     });
     res.json(msgs);
   } catch (err) {
@@ -41,9 +53,13 @@ export const getConversation = async (req: AuthRequest, res: Response) => {
         OR: [
           { senderId: req.user!.id, receiverId: req.params.userId },
           { senderId: req.params.userId, receiverId: req.user!.id },
-        ]
+        ],
       },
-      orderBy: { createdAt: 'asc' }
+      include: {
+        sender: { select: userSelect },
+        receiver: { select: userSelect },
+      },
+      orderBy: { createdAt: 'asc' },
     });
     res.json(msgs);
   } catch (err) {

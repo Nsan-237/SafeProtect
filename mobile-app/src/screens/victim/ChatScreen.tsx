@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -7,111 +7,246 @@ import {
   TextInput,
   TouchableOpacity,
   StatusBar,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
-import { Header } from "../../components/shared/Header";
-import { useRoute } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
+import { useRoute, useFocusEffect } from "@react-navigation/native";
+import { useAuth } from "../../hooks/useAuth";
+import api from "../../services/api";
 
-const initialMessages = [
-  {
-    id: "1",
-    text: "Hi Marie, how can I help you today?",
-    sender: "other",
-    time: "10:28 AM",
-  },
-  {
-    id: "2",
-    text: "I need an update on my case status.",
-    sender: "me",
-    time: "10:29 AM",
-  },
-  {
-    id: "3",
-    text: "Your case is currently under review by the protection team.",
-    sender: "other",
-    time: "10:30 AM",
-  },
-];
+interface Message {
+  id: string;
+  text: string;
+  sender: "me" | "other";
+  time: string;
+}
 
-export const ChatScreen = () => {
+const formatTime = (dateStr: string) =>
+  new Date(dateStr).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+
+export const ChatScreen = ({ navigation }: any) => {
   const route = useRoute();
-  const { chatName, subtitle } = route.params as {
+  const { chatName, subtitle, receiverId } = route.params as {
     chatName?: string;
     subtitle?: string;
+    receiverId?: string;
   };
-  const [messages, setMessages] = useState(initialMessages);
-  const [draft, setDraft] = useState("");
+  const { user } = useAuth();
+  const scrollRef = useRef<ScrollView>(null);
 
-  const handleSend = () => {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [draft, setDraft] = useState("");
+  const [loading, setLoading] = useState(!!receiverId);
+  const [sending, setSending] = useState(false);
+
+  const fetchMessages = useCallback(async () => {
+    if (!receiverId) return;
+    try {
+      setLoading(true);
+      const res = await api.get(`/messages/${receiverId}`);
+      const mapped: Message[] = res.data.map((m: any) => ({
+        id: m.id,
+        text: m.content,
+        sender: m.senderId === user?.id ? "me" : "other",
+        time: formatTime(m.createdAt),
+      }));
+      setMessages(mapped);
+    } catch (err) {
+      console.warn("Error fetching messages:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [receiverId, user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchMessages();
+    }, [fetchMessages]),
+  );
+
+  const handleSend = async () => {
     if (!draft.trim()) return;
-    const nextMessage = {
-      id: String(Date.now()),
-      text: draft.trim(),
-      sender: "me",
-      time: new Date().toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    };
-    setMessages((prev) => [...prev, nextMessage]);
+    const text = draft.trim();
     setDraft("");
+
+    // Optimistic update
+    const tempMsg: Message = {
+      id: String(Date.now()),
+      text,
+      sender: "me",
+      time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+    };
+    setMessages((prev) => [...prev, tempMsg]);
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+
+    if (!receiverId) return; // Offline / demo mode
+
+    try {
+      setSending(true);
+      await api.post("/messages", { receiverId, content: text });
+    } catch (err) {
+      console.warn("Failed to send message:", err);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F8F9FE]">
-      <StatusBar barStyle="dark-content" backgroundColor="#F8F9FE" />
-      <Header title={chatName ? `${chatName}` : "Chat"} />
-      <View className="bg-white border-b border-gray-100 px-4 py-3">
-        <Text className="text-sm text-[#75759E]">
-          {subtitle || "Chat with your support team"}
-        </Text>
-      </View>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={{ flex: 1 }}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+    >
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FE" }}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      <ScrollView
-        className="flex-1 px-4 pt-4"
-        contentContainerStyle={{ paddingBottom: 20 }}
-      >
-        {messages.map((message) => {
-          const isMe = message.sender === "me";
-          return (
-            <View
-              key={message.id}
-              className={`mb-3 flex-row ${isMe ? "justify-end" : "justify-start"}`}
-            >
-              <View
-                className={`max-w-[80%] rounded-3xl px-4 py-3 ${isMe ? "bg-[#5B3FD3]" : "bg-[#F0F0FF]"}`}
-              >
-                <Text className={`${isMe ? "text-white" : "text-[#1E1E2D]"}`}>
-                  {message.text}
-                </Text>
-                <Text
-                  className={`mt-1 text-[11px] ${isMe ? "text-[#D1D7FF]" : "text-[#75759E]"}`}
-                >
-                  {message.time}
+        {/* Header */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            backgroundColor: "#FFFFFF",
+            borderBottomWidth: 1,
+            borderBottomColor: "#F0F0F5",
+          }}
+        >
+          <TouchableOpacity onPress={() => navigation?.goBack()} style={{ marginRight: 12 }}>
+            <Ionicons name="arrow-back" size={24} color="#1E1E2D" />
+          </TouchableOpacity>
+          <View
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 19,
+              backgroundColor: "#F0EDFF",
+              alignItems: "center",
+              justifyContent: "center",
+              marginRight: 10,
+            }}
+          >
+            <Text style={{ fontSize: 16, fontWeight: "800", color: "#5B3FD3" }}>
+              {(chatName ?? "?").charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 16, fontWeight: "800", color: "#1E1E2D" }}>
+              {chatName ?? "Chat"}
+            </Text>
+            {subtitle ? (
+              <Text style={{ fontSize: 12, color: "#75759E" }}>{subtitle}</Text>
+            ) : null}
+          </View>
+        </View>
+
+        {/* Messages */}
+        {loading ? (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+            <ActivityIndicator size="large" color="#5B3FD3" />
+          </View>
+        ) : (
+          <ScrollView
+            ref={scrollRef}
+            style={{ flex: 1, paddingHorizontal: 16 }}
+            contentContainerStyle={{ paddingTop: 16, paddingBottom: 20 }}
+            onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
+          >
+            {messages.length === 0 && (
+              <View style={{ alignItems: "center", marginTop: 40 }}>
+                <Ionicons name="chatbubble-ellipses-outline" size={48} color="#B0B0C8" />
+                <Text style={{ color: "#75759E", marginTop: 12, textAlign: "center" }}>
+                  No messages yet. Say hello!
                 </Text>
               </View>
-            </View>
-          );
-        })}
-      </ScrollView>
+            )}
+            {messages.map((message) => {
+              const isMe = message.sender === "me";
+              return (
+                <View
+                  key={message.id}
+                  style={{
+                    marginBottom: 12,
+                    flexDirection: "row",
+                    justifyContent: isMe ? "flex-end" : "flex-start",
+                  }}
+                >
+                  <View
+                    style={{
+                      maxWidth: "80%",
+                      borderRadius: 20,
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      backgroundColor: isMe ? "#5B3FD3" : "#F0F0FF",
+                    }}
+                  >
+                    <Text style={{ color: isMe ? "#FFFFFF" : "#1E1E2D", fontSize: 14, lineHeight: 20 }}>
+                      {message.text}
+                    </Text>
+                    <Text style={{ marginTop: 4, fontSize: 11, color: isMe ? "rgba(255,255,255,0.65)" : "#75759E" }}>
+                      {message.time}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </ScrollView>
+        )}
 
-      <View className="border-t border-gray-200 bg-white px-4 py-3">
-        <View className="flex-row items-center gap-3">
+        {/* Input bar */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            borderTopWidth: 1,
+            borderTopColor: "#E8E8F0",
+            backgroundColor: "#FFFFFF",
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            gap: 10,
+          }}
+        >
           <TextInput
             value={draft}
             onChangeText={setDraft}
             placeholder="Type a message..."
             placeholderTextColor="#A0A0B8"
-            className="flex-1 rounded-3xl bg-[#F2F4FF] px-4 py-3 text-sm text-[#1E1E2D]"
+            style={{
+              flex: 1,
+              borderRadius: 24,
+              backgroundColor: "#F2F4FF",
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+              fontSize: 14,
+              color: "#1E1E2D",
+            }}
+            multiline
+            onSubmitEditing={handleSend}
+            returnKeyType="send"
           />
           <TouchableOpacity
             onPress={handleSend}
-            className="h-12 w-12 items-center justify-center rounded-full bg-[#5B3FD3]"
+            disabled={sending || !draft.trim()}
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              backgroundColor: draft.trim() ? "#5B3FD3" : "#D0C8F8",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
             activeOpacity={0.8}
           >
-            <Text className="text-white font-bold">Send</Text>
+            {sending ? (
+              <ActivityIndicator size="small" color="#FFF" />
+            ) : (
+              <Ionicons name="send" size={18} color="#FFFFFF" />
+            )}
           </TouchableOpacity>
         </View>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 };

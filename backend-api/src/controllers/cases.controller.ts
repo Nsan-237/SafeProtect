@@ -1,6 +1,37 @@
 import { Request, Response } from 'express';
+import { Prisma, Role } from '@prisma/client';
 import prisma from '../config/database';
 import { generateCaseNumber } from '../utils/caseNumber';
+import { AuthRequest } from '../types';
+
+const getCaseScope = (req: AuthRequest): Prisma.CaseWhereInput | null => {
+  if (!req.user) return null;
+
+  if (req.user.role === Role.ADMIN) return {};
+
+  if (req.user.role === Role.VICTIM) {
+    return {
+      incident: { is: { victim: { is: { userId: req.user.id } } } },
+    };
+  }
+
+  if (req.user.role === Role.SOCIAL_WORKER) {
+    return { assignedWorker: { is: { userId: req.user.id } } };
+  }
+
+  return null;
+};
+
+const caseInclude = {
+  incident: {
+    include: {
+      victim: {
+        include: { user: { select: { name: true, phone: true } } },
+      },
+    },
+  },
+  assignedWorker: { include: { user: { select: { name: true } } } },
+};
 
 export const create = async (req: Request, res: Response) => {
   try {
@@ -14,19 +45,14 @@ export const create = async (req: Request, res: Response) => {
   }
 };
 
-export const getAll = async (req: Request, res: Response) => {
+export const getAll = async (req: AuthRequest, res: Response) => {
   try {
+    const scope = getCaseScope(req);
+    if (!scope) return res.status(403).json({ error: 'Forbidden' });
+
     const cases = await prisma.case.findMany({
-      include: {
-        incident: {
-          include: {
-            victim: {
-              include: { user: { select: { name: true, phone: true } } },
-            },
-          },
-        },
-        assignedWorker: { include: { user: { select: { name: true } } } },
-      },
+      where: scope,
+      include: caseInclude,
       orderBy: { createdAt: 'desc' },
     });
     res.json(cases);
@@ -35,20 +61,14 @@ export const getAll = async (req: Request, res: Response) => {
   }
 };
 
-export const getById = async (req: Request, res: Response) => {
+export const getById = async (req: AuthRequest, res: Response) => {
   try {
-    const c = await prisma.case.findUnique({
-      where: { id: req.params.id },
-      include: {
-        incident: {
-          include: {
-            victim: {
-              include: { user: { select: { name: true, phone: true } } },
-            },
-          },
-        },
-        assignedWorker: { include: { user: { select: { name: true } } } },
-      },
+    const scope = getCaseScope(req);
+    if (!scope) return res.status(403).json({ error: 'Forbidden' });
+
+    const c = await prisma.case.findFirst({
+      where: { AND: [{ id: req.params.id }, scope] },
+      include: caseInclude,
     });
     if (!c) return res.status(404).json({ error: 'Case not found' });
     res.json(c);
@@ -59,27 +79,12 @@ export const getById = async (req: Request, res: Response) => {
 
 export const assign = async (req: Request, res: Response) => {
   try {
-    const c = await prisma.case.update({ where: { id: req.params.id }, data: { assignedWorkerId: req.body.workerId } });
-    res.json(c);
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
-};
+    const worker = await prisma.socialWorker.findUnique({ where: { id: req.body.workerId } });
+    if (!worker) return res.status(400).json({ error: 'Social worker not found' });
 
-export const updateStatus = async (req: Request, res: Response) => {
-  try {
-    const c = await prisma.case.update({ where: { id: req.params.id }, data: { status: req.body.status } });
-    res.json(c);
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
-};
-
-export const addNote = async (req: Request, res: Response) => {
-  try {
     const c = await prisma.case.update({
       where: { id: req.params.id },
-      data: { notes: req.body.notes },
+      data: { assignedWorkerId: worker.id },
     });
     res.json(c);
   } catch (err) {
@@ -87,14 +92,52 @@ export const addNote = async (req: Request, res: Response) => {
   }
 };
 
-export const updateCase = async (req: Request, res: Response) => {
+const updateAssignedCase = async (
+  req: AuthRequest,
+  res: Response,
+  data: Prisma.CaseUpdateInput,
+) => {
+  const scope = getCaseScope(req);
+  if (!scope || req.user?.role === Role.VICTIM) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const result = await prisma.case.updateMany({
+    where: { AND: [{ id: req.params.id }, scope] },
+    data,
+  });
+  if (!result.count) return res.status(404).json({ error: 'Case not found' });
+
+  const c = await prisma.case.findFirst({
+    where: { AND: [{ id: req.params.id }, scope] },
+    include: caseInclude,
+  });
+  res.json(c);
+};
+
+export const updateStatus = async (req: AuthRequest, res: Response) => {
+  try {
+    await updateAssignedCase(req, res, { status: req.body.status });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const addNote = async (req: AuthRequest, res: Response) => {
+  try {
+    await updateAssignedCase(req, res, { notes: req.body.notes });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const updateCase = async (req: AuthRequest, res: Response) => {
   try {
     const { status, notes } = req.body;
-    const data: any = {};
+    const data: Prisma.CaseUpdateInput = {};
     if (status) data.status = status;
     if (notes !== undefined) data.notes = notes;
-    const c = await prisma.case.update({ where: { id: req.params.id }, data });
-    res.json(c);
+    await updateAssignedCase(req, res, data);
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }

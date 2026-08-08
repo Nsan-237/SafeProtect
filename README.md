@@ -1,4 +1,4 @@
-# 🛡️ SafeProtect Cameroon
+# ðŸ›¡ï¸ SafeProtect Cameroon
 
 **Child Protection & Gender-Based Violence (GBV) Management Platform**
 
@@ -6,18 +6,18 @@ A secure digital ecosystem that helps protect children, support GBV victims, con
 
 ---
 
-## 🏗️ Architecture
+## ðŸ—ï¸ Architecture
 
 ```
 SafeProtect/
-├── backend-api/          # Express.js + Prisma + TypeScript API
-├── web-dashboard/        # Next.js 14 Admin Dashboard
-├── mobile-app/           # React Native + Expo Mobile App
-├── package.json          # Root workspace
-└── README.md
+â”œâ”€â”€ backend-api/          # Express.js + Prisma + TypeScript API
+â”œâ”€â”€ web-dashboard/        # Next.js 14 Admin Dashboard
+â”œâ”€â”€ mobile-app/           # React Native + Expo Mobile App
+â”œâ”€â”€ package.json          # Root workspace
+â””â”€â”€ README.md
 ```
 
-## 🚀 Quick Start
+## ðŸš€ Quick Start
 
 ### Prerequisites
 
@@ -103,7 +103,17 @@ Scan the QR code with **Expo Go** on your phone.
 
 ---
 
-## 📱 User Roles
+## API configuration
+
+The mobile and web clients read their API base URL from environment variables instead of a hard-coded address.
+
+- Copy `mobile-app/.env.example` to `mobile-app/.env` and set `EXPO_PUBLIC_API_URL`. Use `http://10.0.2.2:5000/api` for an Android emulator, or your computer's LAN IP (for example `http://192.168.1.10:5000/api`) for a physical phone.
+- Copy `web-dashboard/.env.example` to `web-dashboard/.env.local` and set `NEXT_PUBLIC_API_URL`. The local default is `http://localhost:5000/api`.
+
+Restart Expo or Next.js after changing either value.
+
+---
+## ðŸ“± User Roles
 
 | Role | Platform | Access |
 |------|----------|--------|
@@ -114,7 +124,7 @@ Scan the QR code with **Expo Go** on your phone.
 
 ---
 
-## 🔑 API Endpoints
+## ðŸ”‘ API Endpoints
 
 | Module | Base Route | Description |
 |--------|-----------|-------------|
@@ -133,7 +143,7 @@ Scan the QR code with **Expo Go** on your phone.
 
 ---
 
-## 🎨 Design System
+## ðŸŽ¨ Design System
 
 | Token | Value | Usage |
 |-------|-------|-------|
@@ -148,54 +158,54 @@ Scan the QR code with **Expo Go** on your phone.
 
 ---
 
-## 🔒 Security
+## ðŸ”’ Security
 
-- ✅ bcrypt password hashing (12 salt rounds)
-- ✅ JWT access tokens (15 min) + refresh tokens (7 days)
-- ✅ Role-based access control (RBAC) on all routes
-- ✅ Input validation with Zod
-- ✅ Helmet security headers
-- ✅ CORS configuration
-- ✅ Rate limiting (100 req/15 min, 5 req/15 min on auth)
-- ✅ Secure file upload validation
-- ✅ Audit logging for sensitive operations
-- ✅ Victim data privacy protection
-
----
-
-## 🗄️ Database Schema
-
-```
-User ──→ Victim (1:1)
-User ──→ SocialWorker (1:1)  
-User ──→ Organization (1:1)
-Victim ──→ Incident (1:many)
-Incident ──→ Case (1:1)
-Case ──→ SocialWorker (many:1)
-Victim ──→ Appointment (1:many)
-Organization ──→ Service (1:many)
-User ──→ Message (sender/receiver)
-User ──→ Notification (1:many)
-User ──→ AuditLog (1:many)
-```
+- âœ… bcrypt password hashing (12 salt rounds)
+- âœ… JWT access tokens (15 min) + refresh tokens (7 days)
+- âœ… Role-based access control (RBAC) on all routes
+- âœ… Input validation with Zod
+- âœ… Helmet security headers
+- âœ… CORS configuration
+- âœ… Rate limiting (100 req/15 min, 5 req/15 min on auth)
+- âœ… Secure file upload validation
+- âœ… Audit logging for sensitive operations
+- âœ… Victim data privacy protection
 
 ---
 
-## 📊 Case Workflow
+## ðŸ—„ï¸ Database Schema
 
 ```
-Report Incident → Case Created (NEW)
-    → Assigned to Social Worker (UNDER_INVESTIGATION)
-    → Support Services Connected (SUPPORT_PROVIDED)
-    → Case Resolved (RESOLVED)
-    → Case Archived (CLOSED)
+User â”€â”€â†’ Victim (1:1)
+User â”€â”€â†’ SocialWorker (1:1)  
+User â”€â”€â†’ Organization (1:1)
+Victim â”€â”€â†’ Incident (1:many)
+Incident â”€â”€â†’ Case (1:1)
+Case â”€â”€â†’ SocialWorker (many:1)
+Victim â”€â”€â†’ Appointment (1:many)
+Organization â”€â”€â†’ Service (1:many)
+User â”€â”€â†’ Message (sender/receiver)
+User â”€â”€â†’ Notification (1:many)
+User â”€â”€â†’ AuditLog (1:many)
+```
+
+---
+
+## ðŸ“Š Case Workflow
+
+```
+Report Incident â†’ Case Created (NEW)
+    â†’ Assigned to Social Worker (UNDER_INVESTIGATION)
+    â†’ Support Services Connected (SUPPORT_PROVIDED)
+    â†’ Case Resolved (RESOLVED)
+    â†’ Case Archived (CLOSED)
 ```
 
 **Case ID Format:** `SPC-2026-00001`
 
 ---
 
-## 🛠️ Tech Stack
+## ðŸ› ï¸ Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
@@ -208,8 +218,8 @@ Report Incident → Case Created (NEW)
 
 ---
 
-## 📄 License
+## ðŸ“„ License
 
 This project is built for social impact. All rights reserved.
 
-**SafeProtect Cameroon** — *Protecting those who need it most.*
+**SafeProtect Cameroon** â€” *Protecting those who need it most.*

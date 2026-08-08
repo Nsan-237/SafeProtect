@@ -12,5 +12,8 @@
     "web": "cd web-dashboard && npm run dev",
     "mobile": "cd mobile-app && npx expo start",
     "install:all": "npm install && cd mobile-app && npm install"
+  },
+  "dependencies": {
+    "react-native-web": "^0.21.2"
   }
 }
