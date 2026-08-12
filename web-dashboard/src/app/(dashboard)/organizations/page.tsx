@@ -1,12 +1,33 @@
 "use client";
 
-import { mockOrganizations } from '@/lib/mock-data';
+import { useState, useCallback, useEffect } from 'react';
+import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Building2, Phone, Mail, MapPin, CheckCircle } from 'lucide-react';
 
 export default function OrganizationsPage() {
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const loadData = useCallback(async () => {
+    try {
+      setError('');
+      const response = await api.get('/organizations');
+      setData(response.data);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to load organizations.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  if (loading) return <div className="p-8 text-center text-gray-500">Loading...</div>;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -19,8 +40,10 @@ export default function OrganizationsPage() {
         </Button>
       </div>
 
+      {error && <div className="p-4 bg-red-50 text-red-600 rounded-lg">{error}</div>}
+
       <div className="grid gap-6 md:grid-cols-2">
-        {mockOrganizations.map((org) => (
+        {data.map((org) => (
           <Card key={org.id} className="bg-white">
             <CardHeader className="pb-3">
               <div className="flex justify-between items-start">
@@ -33,7 +56,9 @@ export default function OrganizationsPage() {
                       {org.name}
                       {org.isVerified && <CheckCircle className="h-4 w-4 text-emerald-500" />}
                     </CardTitle>
-                    <Badge variant="outline" className="text-xs mt-0.5">{org.type}</Badge>
+                    <Badge variant="outline" className="text-xs mt-0.5">
+                      {org.type ? org.type.replace('_', ' ') : 'General'}
+                    </Badge>
                   </div>
                 </div>
               </div>
@@ -41,19 +66,19 @@ export default function OrganizationsPage() {
             <CardContent className="space-y-4 pt-1">
               <div className="text-xs text-gray-600 space-y-1.5 bg-gray-50 p-3 rounded-lg">
                 <div className="flex items-center gap-2">
-                  <MapPin className="h-3.5 w-3.5 text-gray-400" /> {org.location}
+                  <MapPin className="h-3.5 w-3.5 text-gray-400" /> {org.location || 'N/A'}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Phone className="h-3.5 w-3.5 text-gray-400" /> {org.phone}
+                  <Phone className="h-3.5 w-3.5 text-gray-400" /> {org.phone || 'N/A'}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Mail className="h-3.5 w-3.5 text-gray-400" /> {org.email}
+                  <Mail className="h-3.5 w-3.5 text-gray-400" /> {org.email || 'N/A'}
                 </div>
               </div>
 
               <div className="flex items-center justify-between text-xs border-t pt-3">
-                <span className="text-gray-500 font-medium">{org.servicesCount} Active Services</span>
-                <span className="font-semibold text-[#5B3FD3]">{org.activeAppointments} Appointments Scheduled</span>
+                <span className="text-gray-500 font-medium">{(org.services || []).length} Active Services</span>
+                <span className="font-semibold text-[#5B3FD3]">{(org.appointments || []).length} Appointments</span>
               </div>
             </CardContent>
           </Card>

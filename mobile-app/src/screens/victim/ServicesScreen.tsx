@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,11 +9,33 @@ import {
   StatusBar,
   Modal,
   Linking,
+  ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import api from '../../services/api';
+import { useAuth } from '../../hooks/useAuth';
 
-const categories = ["All", "Medical", "Legal", "Psychosocial", "Shelter"];
+interface Organization {
+  id: string;
+  name: string;
+  type: string;
+  location: string;
+  phone: string;
+  email: string;
+  description: string;
+}
+
+interface ServiceAPIItem {
+  id: string;
+  organizationId: string;
+  name: string;
+  category: string;
+  description: string;
+  isActive: boolean;
+  organization: Organization;
+}
 
 interface ServiceItem {
   id: string;
@@ -28,91 +50,85 @@ interface ServiceItem {
   iconColor: string;
 }
 
-const servicesData: ServiceItem[] = [
-  {
-    id: "1",
-    name: "Central Hospital Yaoundé",
-    category: "Medical",
-    distance: "2.3 km",
-    address: "Place Henri Dunant, Yaoundé",
-    phone: "+237 222 234 000",
-    hours: "24/7 Emergency Care",
-    icon: "medical-outline",
-    iconBg: "#F0EDFF",
-    iconColor: "#5B3FD3",
-  },
-  {
-    id: "2",
-    name: "Mfoundi Police Station",
-    category: "Law Enforcement",
-    distance: "1.8 km",
-    address: "Avenue de l'Indépendance, Yaoundé",
-    phone: "117",
-    hours: "24/7 Open",
-    icon: "shield-checkmark-outline",
-    iconBg: "#FFF3E0",
-    iconColor: "#E65100",
-  },
-  {
-    id: "3",
-    name: "National Social Welfare Office",
-    category: "Social Services",
-    distance: "2.1 km",
-    address: "MINAS Building, Yaoundé",
-    phone: "+237 222 220 111",
-    hours: "Mon - Fri: 8:00 AM - 4:00 PM",
-    icon: "people-outline",
-    iconBg: "#E3F2FD",
-    iconColor: "#1565C0",
-  },
-  {
-    id: "4",
-    name: "Women's Legal Aid Center",
-    category: "Legal",
-    distance: "3.5 km",
-    address: "Bastos, Quarter 4, Yaoundé",
-    phone: "+237 677 890 123",
-    hours: "Mon - Fri: 8:30 AM - 5:00 PM",
-    icon: "ribbon-outline",
-    iconBg: "#FFF0F3",
-    iconColor: "#EC4899",
-  },
-  {
-    id: "5",
-    name: "Safe Shelter Yaoundé",
-    category: "Shelter",
-    distance: "4.2 km",
-    address: "Confidential Location, Yaoundé",
-    phone: "1332",
-    hours: "24/7 Confidential Intake",
-    icon: "home-outline",
-    iconBg: "#E8F5E9",
-    iconColor: "#2E7D32",
-  },
-];
+const mapCategoryToIcon = (category: string) => {
+  const lowerCat = (category || "").toLowerCase();
+  if (lowerCat.includes("medical") || lowerCat.includes("health")) {
+    return { icon: "medical-outline" as any, iconBg: "#F0EDFF", iconColor: "#5B3FD3" };
+  } else if (lowerCat.includes("legal") || lowerCat.includes("law")) {
+    if (lowerCat.includes("law enforcement") || lowerCat.includes("police")) {
+      return { icon: "shield-checkmark-outline" as any, iconBg: "#FFF3E0", iconColor: "#E65100" };
+    }
+    return { icon: "ribbon-outline" as any, iconBg: "#FFF0F3", iconColor: "#EC4899" };
+  } else if (lowerCat.includes("social") || lowerCat.includes("psychosocial")) {
+    return { icon: "people-outline" as any, iconBg: "#E3F2FD", iconColor: "#1565C0" };
+  } else if (lowerCat.includes("shelter") || lowerCat.includes("home")) {
+    return { icon: "home-outline" as any, iconBg: "#E8F5E9", iconColor: "#2E7D32" };
+  }
+  return { icon: "business-outline" as any, iconBg: "#F5F5F5", iconColor: "#757575" };
+};
 
 export const ServicesScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth(); // If auth context is needed
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedService, setSelectedService] = useState<ServiceItem | null>(
-    null,
-  );
+  const [selectedService, setSelectedService] = useState<ServiceItem | null>(null);
+  
+  const [servicesData, setServicesData] = useState<ServiceItem[]>([]);
+  const [categories, setCategories] = useState<string[]>(["All"]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchServices = useCallback(async () => {
+    try {
+      setError(null);
+      const response = await api.get('/services');
+      const apiData: ServiceAPIItem[] = response.data;
+      
+      const uniqueCategories = new Set<string>();
+      
+      const mappedData: ServiceItem[] = apiData.map(item => {
+        if (item.category) uniqueCategories.add(item.category);
+        const iconConfig = mapCategoryToIcon(item.category);
+        
+        return {
+          id: item.id,
+          name: item.name,
+          category: item.category || "General",
+          distance: "N/A",
+          address: item.organization?.location || "Unknown Location",
+          phone: item.organization?.phone || "N/A",
+          hours: item.description || "N/A",
+          icon: iconConfig.icon,
+          iconBg: iconConfig.iconBg,
+          iconColor: iconConfig.iconColor,
+        };
+      });
+      
+      setCategories(["All", ...Array.from(uniqueCategories)]);
+      setServicesData(mappedData);
+    } catch (err: any) {
+      console.error('Error fetching services:', err);
+      setError(err.response?.data?.message || 'Failed to load services');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchServices();
+  }, [fetchServices]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchServices();
+  }, [fetchServices]);
 
   const filteredServices = servicesData.filter((s) => {
-    // Category match logic
-    let matchesCategory = true;
-    if (selectedCategory === "Medical")
-      matchesCategory = s.category === "Medical";
-    else if (selectedCategory === "Legal")
-      matchesCategory =
-        s.category === "Legal" || s.category === "Law Enforcement";
-    else if (selectedCategory === "Psychosocial")
-      matchesCategory = s.category === "Social Services";
-    else if (selectedCategory === "Shelter")
-      matchesCategory = s.category === "Shelter";
-
-    // Search query match logic
+    const matchesCategory = selectedCategory === "All" || s.category === selectedCategory;
+    
     const matchesSearch =
       s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -244,8 +260,43 @@ export const ServicesScreen = ({ navigation }: any) => {
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#5B3FD3" />
+        }
       >
-        {filteredServices.length === 0 ? (
+        {loading && !refreshing ? (
+          <ActivityIndicator size="large" color="#5B3FD3" style={{ marginTop: 40 }} />
+        ) : error ? (
+          <View style={{ alignItems: "center", marginTop: 48 }}>
+            <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
+            <Text
+              style={{
+                color: "#1E1E2D",
+                fontSize: 15,
+                fontWeight: "700",
+                marginTop: 12,
+              }}
+            >
+              Error Loading Services
+            </Text>
+            <Text
+              style={{
+                color: "#75759E",
+                fontSize: 13,
+                marginTop: 4,
+                textAlign: "center",
+              }}
+            >
+              {error}
+            </Text>
+            <TouchableOpacity 
+              onPress={fetchServices}
+              style={{ marginTop: 16, backgroundColor: '#5B3FD3', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 }}
+            >
+              <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : filteredServices.length === 0 ? (
           <View style={{ alignItems: "center", marginTop: 48 }}>
             <Ionicons name="search-outline" size={48} color="#B0B0C8" />
             <Text

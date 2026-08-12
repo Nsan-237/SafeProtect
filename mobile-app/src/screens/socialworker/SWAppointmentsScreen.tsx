@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,46 +6,45 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
+  ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import api from '../../services/api';
+import { useAuth } from '../../hooks/useAuth';
 
-const scheduleData = [
-  {
-    id: "a1",
-    title: "Case Review — Marie Dupont",
-    dateTime: "07 Jun 2024 • 10:00 AM",
-    detail: "At: Social Welfare Office, Yaoundé",
-    status: "Confirmed",
-  },
-  {
-    id: "a2",
-    title: "Hospital Accompany Visit",
-    dateTime: "08 Jun 2024 • 9:30 AM",
-    detail: "At: Central Hospital",
-    status: "Confirmed",
-  },
-  {
-    id: "a3",
-    title: "Legal Aid Coordination",
-    dateTime: "10 Jun 2024 • 2:00 PM",
-    detail: "With: Women's Legal Aid Center",
-    status: "Pending",
-  },
-  {
-    id: "a4",
-    title: "Team Supervision Session",
-    dateTime: "12 Jun 2024 • 3:00 PM",
-    detail: "At: MINPROFF Office",
-    status: "Pending",
-  },
-];
+interface AppointmentAPIItem {
+  id: string;
+  victimId: string;
+  organizationId: string;
+  socialWorkerId: string;
+  title: string;
+  date: string;
+  time: string;
+  type: string;
+  status: string;
+  notes: string;
+  createdAt: string;
+  victim?: { user?: { name: string; email: string } };
+  organization?: { id: string; name: string; location: string };
+  socialWorker?: { user?: { name: string } };
+}
+
+interface AppointmentItem {
+  id: string;
+  title: string;
+  dateTime: string;
+  detail: string;
+  status: string;
+}
 
 const StatusBadge = ({ status }: { status: string }) => {
   const map: Record<string, { bg: string; text: string }> = {
     Confirmed: { bg: "#E8F5E9", text: "#2E7D32" },
     Pending: { bg: "#FFF3E0", text: "#E65100" },
     Completed: { bg: "#E3F2FD", text: "#1565C0" },
+    Cancelled: { bg: "#FFEBEE", text: "#C62828" },
   };
   const s = map[status] ?? { bg: "#F5F5F5", text: "#757575" };
   return (
@@ -66,13 +65,72 @@ const StatusBadge = ({ status }: { status: string }) => {
 
 export const SWAppointmentsScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth(); // If auth context is needed
   const [activeTab, setActiveTab] = useState<"upcoming" | "history">(
     "upcoming",
   );
+  
+  const [scheduleData, setScheduleData] = useState<AppointmentItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchAppointments = useCallback(async () => {
+    try {
+      setError(null);
+      const response = await api.get('/appointments');
+      const apiData: AppointmentAPIItem[] = response.data;
+      
+      const mappedData: AppointmentItem[] = apiData.map(item => {
+        let mappedStatus = item.status;
+        if (item.status === 'SCHEDULED') mappedStatus = 'Confirmed';
+        else if (item.status === 'COMPLETED') mappedStatus = 'Completed';
+        else if (item.status === 'CANCELLED') mappedStatus = 'Cancelled';
+        
+        let dateStr = item.date;
+        try {
+          const d = new Date(item.date);
+          const month = d.toLocaleString('default', { month: 'short' });
+          dateStr = `${d.getDate().toString().padStart(2, '0')} ${month} ${d.getFullYear()}`;
+        } catch(e) {}
+        
+        const timeStr = item.time ? item.time : '';
+        const dateTimeStr = timeStr ? `${dateStr} • ${timeStr}` : dateStr;
+        
+        const detailStr = item.organization?.location || item.organization?.name || 'No location provided';
+        
+        return {
+          id: item.id,
+          title: item.title || 'Appointment',
+          dateTime: dateTimeStr,
+          detail: detailStr,
+          status: mappedStatus,
+        };
+      });
+      
+      setScheduleData(mappedData);
+    } catch (err: any) {
+      console.error('Error fetching appointments:', err);
+      setError(err.response?.data?.message || 'Failed to load appointments');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAppointments();
+  }, [fetchAppointments]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchAppointments();
+  }, [fetchAppointments]);
+
   const displayed =
     activeTab === "upcoming"
-      ? scheduleData.filter((a) => a.status !== "Completed")
-      : scheduleData.filter((a) => a.status === "Completed");
+      ? scheduleData.filter((a) => a.status !== "Completed" && a.status !== "Cancelled")
+      : scheduleData.filter((a) => a.status === "Completed" || a.status === "Cancelled");
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FE" }}>
@@ -129,8 +187,43 @@ export const SWAppointmentsScreen = ({ navigation }: any) => {
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#5B3FD3" />
+        }
       >
-        {displayed.length === 0 ? (
+        {loading && !refreshing ? (
+          <ActivityIndicator size="large" color="#5B3FD3" style={{ marginTop: 40 }} />
+        ) : error ? (
+          <View style={{ alignItems: "center", marginTop: 48 }}>
+            <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
+            <Text
+              style={{
+                color: "#1E1E2D",
+                fontSize: 15,
+                fontWeight: "700",
+                marginTop: 12,
+              }}
+            >
+              Error Loading Appointments
+            </Text>
+            <Text
+              style={{
+                color: "#75759E",
+                fontSize: 13,
+                marginTop: 4,
+                textAlign: "center",
+              }}
+            >
+              {error}
+            </Text>
+            <TouchableOpacity 
+              onPress={fetchAppointments}
+              style={{ marginTop: 16, backgroundColor: '#5B3FD3', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 }}
+            >
+              <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : displayed.length === 0 ? (
           <View style={{ alignItems: "center", marginTop: 48 }}>
             <Ionicons name="calendar-outline" size={52} color="#B0B0C8" />
             <Text

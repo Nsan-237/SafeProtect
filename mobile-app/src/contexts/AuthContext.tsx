@@ -59,6 +59,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const res = await api.post("/auth/login", { email, password });
     const { user: userData, tokens } = res.data;
 
+    // B1 Security: ADMIN and ORGANIZATION accounts are restricted to the web dashboard only.
+    if (userData.role === 'ADMIN' || userData.role === 'ORGANIZATION') {
+      throw new Error(
+        'This account is for the web dashboard only.\nPlease use the SafeProtect web portal to sign in.'
+      );
+    }
+
     await AsyncStorage.setItem("@token", tokens.accessToken);
     await AsyncStorage.setItem("@refreshToken", tokens.refreshToken);
     await AsyncStorage.setItem("@user", JSON.stringify(userData));

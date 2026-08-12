@@ -1,8 +1,9 @@
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+//To change the ip address
 const baseURL =
-  process.env.EXPO_PUBLIC_API_URL ?? "http://10.63.48.37:5000/api";
+  process.env.EXPO_PUBLIC_API_URL ?? "http://10.213.43.37:5000/api";
 
 const api = axios.create({
   baseURL,

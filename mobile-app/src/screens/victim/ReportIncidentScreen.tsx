@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   StyleSheet,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,6 +19,7 @@ import { useAuth } from "../../hooks/useAuth";
 import api from "../../services/api";
 import MapView, { Marker, Region } from "react-native-maps";
 import * as Location from "expo-location";
+import * as ImagePicker from "expo-image-picker";
 
 const YAOUNDE_COORD = {
   latitude: 3.848,
@@ -39,6 +41,9 @@ export const ReportIncidentScreen = ({ navigation }: any) => {
   // Map specific state
   const [mapRegion, setMapRegion] = useState<Region>(YAOUNDE_COORD);
   const [markerCoord, setMarkerCoord] = useState(YAOUNDE_COORD);
+
+  // Evidence images state
+  const [evidenceImages, setEvidenceImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
 
   const categories = [
     { title: "Physical Abuse", icon: "hand-left" },
@@ -107,6 +112,44 @@ export const ReportIncidentScreen = ({ navigation }: any) => {
     }
   }, [step]);
 
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.7,
+    });
+    if (!result.canceled) {
+      setEvidenceImages(prev => {
+        const newImages = [...prev, ...result.assets];
+        return newImages.slice(0, 5); // Limit to 5 images
+      });
+    }
+  };
+
+  const takePhoto = async () => {
+    // Request camera permissions first
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert("Permission Denied", "Sorry, we need camera permissions to make this work!");
+      return;
+    }
+    
+    let result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+    });
+    if (!result.canceled) {
+      setEvidenceImages(prev => {
+        const newImages = [...prev, ...result.assets];
+        return newImages.slice(0, 5); // Limit to 5 images
+      });
+    }
+  };
+
+  const removeImage = (uri: string) => {
+    setEvidenceImages(prev => prev.filter(img => img.uri !== uri));
+  };
+
   const handleNext = () => {
     if (step === 1 && !category) {
       Alert.alert("Required", "Please select a category of incident to continue.");
@@ -125,14 +168,29 @@ export const ReportIncidentScreen = ({ navigation }: any) => {
       // Combine manual text location with GPS coords if available
       const finalLocation = `${location} (Lat: ${markerCoord.latitude.toFixed(4)}, Lng: ${markerCoord.longitude.toFixed(4)})`;
 
-      const res = await api.post("/incidents", {
-        victimId: user?.victimProfile?.id || undefined,
-        category: mapCategory(category),
-        description: details || `Reported ${category} incident at ${location}`,
-        location: finalLocation,
-        date: new Date().toISOString(),
-        riskLevel: mapRiskLevel(riskLevel),
-        isAnonymous: false,
+      const formData = new FormData();
+      if (user?.victimProfile?.id) {
+        formData.append('victimId', user.victimProfile.id);
+      }
+      formData.append('category', mapCategory(category));
+      formData.append('description', details || `Reported ${category} incident at ${location}`);
+      formData.append('location', finalLocation);
+      formData.append('date', new Date().toISOString());
+      formData.append('riskLevel', mapRiskLevel(riskLevel));
+      formData.append('isAnonymous', 'false');
+
+      if (evidenceImages.length > 0) {
+        // According to instructions backend accepts a single file currently `upload.single('evidence')`
+        const img = evidenceImages[0];
+        formData.append('evidence', {
+          uri: img.uri,
+          name: img.fileName || 'evidence.jpg',
+          type: img.mimeType || 'image/jpeg',
+        } as any);
+      }
+
+      const res = await api.post("/incidents", formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
 
       const caseNum = res.data?.case?.caseNumber || "SPC-UNKNOWN";
@@ -264,6 +322,88 @@ export const ReportIncidentScreen = ({ navigation }: any) => {
             />
 
             <Text style={{ fontSize: 11, fontWeight: "700", color: "#75759E", textTransform: "uppercase", marginBottom: 6 }}>
+              Photo Evidence (Optional)
+            </Text>
+            
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+              <TouchableOpacity
+                onPress={pickImage}
+                style={{
+                  flex: 1,
+                  backgroundColor: "#FFFFFF",
+                  borderWidth: 1.5,
+                  borderColor: "#5B3FD3",
+                  borderStyle: "dashed",
+                  borderRadius: 14,
+                  padding: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'row',
+                  gap: 8,
+                }}
+              >
+                <Ionicons name="images-outline" size={20} color="#5B3FD3" />
+                <Text style={{ color: "#5B3FD3", fontWeight: "600", fontSize: 14 }}>Attach Photo</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                onPress={takePhoto}
+                style={{
+                  flex: 1,
+                  backgroundColor: "#FFFFFF",
+                  borderWidth: 1.5,
+                  borderColor: "#5B3FD3",
+                  borderStyle: "dashed",
+                  borderRadius: 14,
+                  padding: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'row',
+                  gap: 8,
+                }}
+              >
+                <Ionicons name="camera-outline" size={20} color="#5B3FD3" />
+                <Text style={{ color: "#5B3FD3", fontWeight: "600", fontSize: 14 }}>Take Photo</Text>
+              </TouchableOpacity>
+            </View>
+
+            {evidenceImages.length > 0 && (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 11, fontWeight: "600", color: "#75759E", marginBottom: 8 }}>
+                  Selected Photos ({evidenceImages.length}/5)
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {evidenceImages.map((img, index) => (
+                    <View key={index} style={{ marginRight: 12, position: 'relative' }}>
+                      <Image
+                        source={{ uri: img.uri }}
+                        style={{ width: 80, height: 80, borderRadius: 12, backgroundColor: "#E8E8F0" }}
+                      />
+                      <TouchableOpacity
+                        onPress={() => removeImage(img.uri)}
+                        style={{
+                          position: 'absolute',
+                          top: -6,
+                          right: -6,
+                          backgroundColor: '#FF2E55',
+                          borderRadius: 12,
+                          width: 24,
+                          height: 24,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderWidth: 2,
+                          borderColor: '#FFFFFF',
+                        }}
+                      >
+                        <Ionicons name="close" size={14} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            <Text style={{ fontSize: 11, fontWeight: "700", color: "#75759E", textTransform: "uppercase", marginBottom: 6 }}>
               Location Address
             </Text>
             <View
@@ -378,6 +518,15 @@ export const ReportIncidentScreen = ({ navigation }: any) => {
               <View style={{ marginBottom: 14 }}>
                 <Text style={{ fontSize: 11, fontWeight: "700", color: "#75759E", textTransform: "uppercase", marginBottom: 2 }}>Details</Text>
                 <Text style={{ fontSize: 14, color: "#1E1E2D" }}>{details || "No additional details specified."}</Text>
+              </View>
+
+              <View style={{ marginBottom: 14 }}>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: "#75759E", textTransform: "uppercase", marginBottom: 2 }}>Evidence</Text>
+                <Text style={{ fontSize: 14, color: "#1E1E2D" }}>
+                  {evidenceImages.length > 0 
+                    ? `${evidenceImages.length} photo(s) attached` 
+                    : "No photos attached"}
+                </Text>
               </View>
 
               <View style={{ marginBottom: 14 }}>

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from 'react';
-import { mockIncidents } from '@/lib/mock-data';
+import { useState, useCallback, useEffect } from 'react';
+import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,45 +9,82 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { AlertTriangle, Filter, Search, ShieldAlert, CheckCircle2, Clock } from 'lucide-react';
 
 export default function IncidentsPage() {
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
-  const filteredIncidents = mockIncidents.filter((inc) => {
+  const loadData = useCallback(async () => {
+    try {
+      setError('');
+      const response = await api.get('/incidents');
+      setData(response.data);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to load incidents.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const filteredIncidents = data.filter((inc) => {
+    const typeStr = (inc.category || '').replace('_', ' ');
+    const status = inc.cases?.[0]?.status || 'New';
+    
     const matchesSearch =
       inc.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      inc.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      inc.location.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'ALL' || inc.status === statusFilter;
+      typeStr.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (inc.location || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'ALL' || status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
+    switch (status?.toUpperCase()) {
+      case 'NEW':
       case 'New':
         return <Badge variant="destructive">New</Badge>;
+      case 'UNDER_INVESTIGATION':
       case 'Under Investigation':
         return <Badge className="bg-amber-500 hover:bg-amber-600 text-white">In Progress</Badge>;
+      case 'SUPPORT_PROVIDED':
       case 'Support Provided':
         return <Badge className="bg-blue-500 hover:bg-blue-600 text-white">Support Provided</Badge>;
+      case 'RESOLVED':
       case 'Resolved':
         return <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white">Resolved</Badge>;
       default:
-        return <Badge variant="secondary">{status}</Badge>;
+        return <Badge variant="secondary">{status || 'New'}</Badge>;
     }
   };
 
   const getRiskBadge = (risk?: string) => {
-    switch (risk) {
-      case 'Critical':
+    switch (risk?.toUpperCase()) {
+      case 'CRITICAL':
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Critical</span>;
-      case 'High':
+      case 'HIGH':
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">High</span>;
-      case 'Medium':
+      case 'MEDIUM':
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Medium</span>;
       default:
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Low</span>;
     }
   };
+
+  const formatType = (cat: string) => {
+    if (!cat) return 'Other';
+    return cat.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+  };
+
+  const formatDate = (iso: string) => {
+    if (!iso) return '';
+    return new Date(iso).toLocaleDateString();
+  };
+
+  if (loading) return <div className="p-8 text-center text-gray-500">Loading...</div>;
 
   return (
     <div className="space-y-6">
@@ -61,13 +98,17 @@ export default function IncidentsPage() {
         </Button>
       </div>
 
+      {error && <div className="p-4 bg-red-50 text-red-600 rounded-lg">{error}</div>}
+
       <div className="grid gap-4 md:grid-cols-4">
         <Card className="bg-white border-l-4 border-l-red-500">
           <CardHeader className="py-3">
             <CardTitle className="text-xs text-gray-500 flex justify-between items-center">
               New Reports <AlertTriangle className="h-4 w-4 text-red-500" />
             </CardTitle>
-            <div className="text-2xl font-bold text-gray-900">2</div>
+            <div className="text-2xl font-bold text-gray-900">
+              {data.filter(i => (i.cases?.[0]?.status?.toUpperCase() || 'NEW') === 'NEW').length}
+            </div>
           </CardHeader>
         </Card>
         <Card className="bg-white border-l-4 border-l-amber-500">
@@ -75,7 +116,9 @@ export default function IncidentsPage() {
             <CardTitle className="text-xs text-gray-500 flex justify-between items-center">
               Under Investigation <Clock className="h-4 w-4 text-amber-500" />
             </CardTitle>
-            <div className="text-2xl font-bold text-gray-900">2</div>
+            <div className="text-2xl font-bold text-gray-900">
+              {data.filter(i => (i.cases?.[0]?.status?.toUpperCase()) === 'UNDER_INVESTIGATION').length}
+            </div>
           </CardHeader>
         </Card>
         <Card className="bg-white border-l-4 border-l-blue-500">
@@ -83,7 +126,9 @@ export default function IncidentsPage() {
             <CardTitle className="text-xs text-gray-500 flex justify-between items-center">
               Support Provided <ShieldAlert className="h-4 w-4 text-blue-500" />
             </CardTitle>
-            <div className="text-2xl font-bold text-gray-900">1</div>
+            <div className="text-2xl font-bold text-gray-900">
+              {data.filter(i => (i.cases?.[0]?.status?.toUpperCase()) === 'SUPPORT_PROVIDED').length}
+            </div>
           </CardHeader>
         </Card>
         <Card className="bg-white border-l-4 border-l-emerald-500">
@@ -91,7 +136,9 @@ export default function IncidentsPage() {
             <CardTitle className="text-xs text-gray-500 flex justify-between items-center">
               Resolved Cases <CheckCircle2 className="h-4 w-4 text-emerald-500" />
             </CardTitle>
-            <div className="text-2xl font-bold text-gray-900">1</div>
+            <div className="text-2xl font-bold text-gray-900">
+              {data.filter(i => (i.cases?.[0]?.status?.toUpperCase()) === 'RESOLVED').length}
+            </div>
           </CardHeader>
         </Card>
       </div>
@@ -117,10 +164,10 @@ export default function IncidentsPage() {
                 className="border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#5B3FD3]"
               >
                 <option value="ALL">All Statuses</option>
-                <option value="New">New</option>
-                <option value="Under Investigation">Under Investigation</option>
-                <option value="Support Provided">Support Provided</option>
-                <option value="Resolved">Resolved</option>
+                <option value="NEW">New</option>
+                <option value="UNDER_INVESTIGATION">Under Investigation</option>
+                <option value="SUPPORT_PROVIDED">Support Provided</option>
+                <option value="RESOLVED">Resolved</option>
               </select>
             </div>
           </div>
@@ -143,13 +190,15 @@ export default function IncidentsPage() {
               <TableBody>
                 {filteredIncidents.map((incident) => (
                   <TableRow key={incident.id}>
-                    <TableCell className="font-semibold text-[#5B3FD3]">{incident.id}</TableCell>
-                    <TableCell className="font-medium">{incident.type}</TableCell>
+                    <TableCell className="font-semibold text-[#5B3FD3]">{incident.id.slice(0, 8)}</TableCell>
+                    <TableCell className="font-medium">{formatType(incident.category)}</TableCell>
                     <TableCell className="text-gray-600">{incident.location}</TableCell>
-                    <TableCell className="text-gray-500 text-sm">{incident.date}</TableCell>
+                    <TableCell className="text-gray-500 text-sm">{formatDate(incident.date)}</TableCell>
                     <TableCell>{getRiskBadge(incident.riskLevel)}</TableCell>
-                    <TableCell>{getStatusBadge(incident.status)}</TableCell>
-                    <TableCell className="text-gray-700 font-medium">{incident.assignedTo}</TableCell>
+                    <TableCell>{getStatusBadge(incident.cases?.[0]?.status)}</TableCell>
+                    <TableCell className="text-gray-700 font-medium">
+                      {incident.cases?.[0]?.assignedWorker?.user?.name || 'Unassigned'}
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button variant="outline" size="sm" className="text-xs">
                         View Details

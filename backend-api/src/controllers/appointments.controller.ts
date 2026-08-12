@@ -59,10 +59,28 @@ export const getById = async (req: Request, res: Response) => {
   }
 };
 
-export const update = async (req: Request, res: Response) => {
+export const update = async (req: AuthRequest, res: Response) => {
   try {
-    const appt = await prisma.appointment.update({ where: { id: req.params.id }, data: req.body });
-    res.json(appt);
+    const appt = await prisma.appointment.findUnique({ where: { id: req.params.id } });
+    if (!appt) return res.status(404).json({ error: 'Appointment not found' });
+
+    // Ownership check: Victims can only update their own appointments
+    if (req.user?.role === Role.VICTIM) {
+      const victim = await prisma.victim.findUnique({ where: { userId: req.user.id } });
+      if (!victim || appt.victimId !== victim.id) {
+        return res.status(403).json({ error: 'Forbidden: You can only update your own appointments' });
+      }
+    }
+    // Ownership check: Social workers can only update appointments assigned to them
+    if (req.user?.role === Role.SOCIAL_WORKER) {
+      const worker = await prisma.socialWorker.findUnique({ where: { userId: req.user.id } });
+      if (!worker || appt.socialWorkerId !== worker.id) {
+        return res.status(403).json({ error: 'Forbidden: You can only update your assigned appointments' });
+      }
+    }
+
+    const updated = await prisma.appointment.update({ where: { id: req.params.id }, data: req.body });
+    res.json(updated);
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
@@ -95,8 +113,21 @@ export const complete = async (req: Request, res: Response) => {
   }
 };
 
-export const deleteAppointment = async (req: Request, res: Response) => {
+export const deleteAppointment = async (req: AuthRequest, res: Response) => {
   try {
+    const appt = await prisma.appointment.findUnique({ where: { id: req.params.id } });
+    if (!appt) return res.status(404).json({ error: 'Appointment not found' });
+
+    // Ownership check: only the victim who owns it or an admin may delete
+    if (req.user?.role === Role.VICTIM) {
+      const victim = await prisma.victim.findUnique({ where: { userId: req.user.id } });
+      if (!victim || appt.victimId !== victim.id) {
+        return res.status(403).json({ error: 'Forbidden: You can only delete your own appointments' });
+      }
+    } else if (req.user?.role === Role.SOCIAL_WORKER) {
+      return res.status(403).json({ error: 'Forbidden: Social workers cannot delete appointments' });
+    }
+
     await prisma.appointment.delete({ where: { id: req.params.id } });
     res.json({ message: 'Deleted' });
   } catch (err) {
