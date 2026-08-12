@@ -1,0 +1,1 @@
+Expo-based React Native mobile app providing victim and social worker portals for case management, appointments, messaging, emergency SOS, and service discovery.

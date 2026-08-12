@@ -1,0 +1,4 @@
+- Each domain feature follows a three-file layout: `routes/<domain>.ts` declares Express routes, `controllers/<domain>.controller.ts` implements handlers, and optional `*.routes.ts` helper files compose them.
+- Route-level protection is applied by chaining `validate` → `auth` → `rbac` middleware before controller invocation.
+- All configuration (ports, DB URL, secrets) is accessed through the typed `config/env.ts` module rather than direct `process.env` reads.
+- Unhandled errors are funneled through the single `middleware/errorHandler.ts` express error handler placed last in the middleware stack.

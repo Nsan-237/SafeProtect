@@ -1,0 +1,1 @@
+Express Router + TypeScript controllers, Prisma ORM for data access, RBAC via custom `authenticate`/`authorize` middleware, Prisma roles (`Role.ADMIN`, `Role.ORGANIZATION`) from `@prisma/client`.

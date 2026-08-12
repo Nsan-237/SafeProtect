@@ -1,0 +1,4 @@
+- Controller actions wrap body parsing, validation, and DB calls in try/catch blocks that return uniform `{ error }` JSON responses with appropriate HTTP status codes.
+- User entities are never returned raw from the API; a local `sanitizeUser` helper destructures out `password` before sending responses.
+- Login and register flows issue both an access token and a refresh token, persisting the refresh token in the `RefreshToken` table with a fixed 7-day `expiresAt` timestamp.
+- Route definitions are kept minimal in `auth.routes.ts`, importing the controller namespace and mapping each POST endpoint directly to its handler function.

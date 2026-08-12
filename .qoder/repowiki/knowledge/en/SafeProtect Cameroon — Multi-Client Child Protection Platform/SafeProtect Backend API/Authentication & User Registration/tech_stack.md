@@ -1,0 +1,1 @@
+Express Router + Prisma Client for persistence (User, RefreshToken models), bcrypt-style hashing via `../utils/password`, and JSON Web Tokens generated/verified through `../utils/token` with a 7-day refresh token TTL stored in the database.

@@ -1,0 +1,1 @@
+Next.js 14 client-side admin dashboard for SafeProtect Cameroon that provides role-based views over cases, incidents, victims, social workers, organizations, appointments, messages, and reports.

@@ -1,0 +1,1 @@
+Node.js 18+ runtime across all three services; TypeScript as the shared language; MySQL 8 with Prisma ORM for the database; JWT + bcrypt for authentication; Express.js for the REST API surface consumed by both the Next.js web dashboard and the Expo mobile app.

@@ -1,0 +1,1 @@
+Monorepo orchestrating a shared Express/Prisma backend API consumed by a Next.js admin dashboard and an Expo mobile app, all bound to a single MySQL database and JWT-based RBAC contract.

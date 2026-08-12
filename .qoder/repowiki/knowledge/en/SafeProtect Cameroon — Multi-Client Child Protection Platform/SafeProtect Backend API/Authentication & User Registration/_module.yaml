@@ -1,0 +1,12 @@
+schema_version: 1
+module_path: backend_api/auth_users
+title: Authentication & User Registration
+scope:
+    - backend-api/src/controllers/auth.controller.ts
+    - backend-api/src/routes/auth.routes.ts
+    - backend-api/src/middleware/auth.ts
+source_files: []
+depends_on: []
+related_to:
+    - path: mobile_app
+    - path: web_dashboard

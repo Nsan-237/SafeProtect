@@ -1,0 +1,1 @@
+Run the full stack from the repo root with `npm run install:all` followed by `npm run backend`, `npm run web`, and `npm run mobile` (each spawns its own dev server); the backend requires `docker-compose up -d`, `npx prisma generate`, `npx prisma db push`, and `npx prisma db seed` before starting.

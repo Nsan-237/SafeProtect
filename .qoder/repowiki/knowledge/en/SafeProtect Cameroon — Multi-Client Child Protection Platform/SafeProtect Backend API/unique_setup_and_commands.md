@@ -1,0 +1,1 @@
+Server starts via `npm start` (or `node dist/index.ts`) after building TypeScript; environment variables are loaded from `.env` (see `.env.example`); Prisma migrations/seeds live under `prisma/schema.prisma` and `prisma/seed.ts`; uploaded files are served statically from the `uploads/` directory.

@@ -1,0 +1,5 @@
+- Screens are organized by role under `src/screens/{auth,victim,socialworker}` and grouped into tab stacks per role in `src/navigation/VictimTabs.tsx` and `SocialWorkerTabs.tsx`.
+- Authentication state and session persistence are accessed exclusively through the `useAuth` hook wrapping `AuthContext`, never reading AsyncStorage directly from screens.
+- All network requests use the shared `api` axios instance; tokens are attached automatically by the request interceptor and 401 responses trigger a single deduplicated refresh flow.
+- UI components in `src/components/shared` are pure presentational React components styled with NativeWind/Tailwind class names rather than inline styles.
+- Shared domain models (User, Case, Appointment, Service, Message) are defined once in `src/types/index.ts` and imported by both services and screens.

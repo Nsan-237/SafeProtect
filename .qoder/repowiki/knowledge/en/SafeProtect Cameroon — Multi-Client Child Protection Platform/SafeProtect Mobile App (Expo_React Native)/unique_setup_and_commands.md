@@ -1,0 +1,1 @@
+Run with `npm start` (or `expo start`); platform-specific entry points `npm run android`, `npm run ios`, `npm run web`. Backend URL is configured via the `EXPO_PUBLIC_API_URL` environment variable (falls back to `http://10.213.43.37:5000/api`); copy `.env.example` to `.env` and set the API base URL before running.

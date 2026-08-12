@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: mobile_app
+title: SafeProtect Mobile App (Expo/React Native)
+scope:
+    - mobile-app/
+source_files: []
+depends_on: []
+related_to:
+    - path: backend_api/auth_users

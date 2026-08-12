@@ -1,0 +1,6 @@
+- Feature pages are colocated as `src/app/(dashboard)/<feature>/page.tsx` files inside the `(dashboard)` route group, sharing a common `DashboardLayout` wrapper defined in the group's `layout.tsx`.
+- Client-only pages opt into interactivity with the `'use client'` directive at the top of the file and perform route guards by reading `localStorage('@token')` before fetching data.
+- All server communication goes through the shared `api` Axios instance in `src/lib/api.ts`, which automatically attaches `Authorization: Bearer <token>` headers and handles 401 refresh-token retry logic.
+- Domain shapes are declared once in `src/types/index.ts` as TypeScript interfaces/enums and imported by both pages and components rather than redefined inline.
+- Reusable visual building blocks are extracted into `src/components/ui/*` (shadcn-style primitives) and composed by higher-level feature pages instead of using raw HTML/Tailwind directly.
+- Charts are implemented as dedicated components under `src/components/charts/` using Recharts and consumed by dashboard pages via named imports.

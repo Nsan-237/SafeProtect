@@ -1,0 +1,1 @@
+Express routes and controller handlers for user registration, login, refresh-token rotation, password reset, and Bearer token-based authentication middleware.

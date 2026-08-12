@@ -1,0 +1,12 @@
+schema_version: 1
+module_path: backend_api/organizations_services
+title: Organizations & Services REST API
+scope:
+    - backend-api/src/controllers/organizations.controller.ts
+    - backend-api/src/routes/organizations.routes.ts
+    - backend-api/src/controllers/services.controller.ts
+    - backend-api/src/routes/services.routes.ts
+source_files: []
+depends_on: []
+related_to:
+    - path: web_dashboard

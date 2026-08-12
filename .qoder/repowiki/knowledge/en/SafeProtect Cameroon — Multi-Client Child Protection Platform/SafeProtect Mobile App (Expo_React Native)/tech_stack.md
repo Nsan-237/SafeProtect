@@ -1,0 +1,1 @@
+Expo SDK ~54 with React Native 0.81 / React 19; navigation via @react-navigation/native + stack/tabs; state persistence with @react-native-async-storage/async-storage; HTTP via axios with interceptor-based token refresh; styling via NativeWind v4 + Tailwind CSS; maps via react-native-maps; camera/image picker via expo-camera & expo-image-picker; location via expo-location.

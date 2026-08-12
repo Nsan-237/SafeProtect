@@ -1,0 +1,1 @@
+Express-based REST API that wires per-domain route/controller modules under a shared /api prefix, enforcing auth, RBAC, validation, and error handling via common middleware.

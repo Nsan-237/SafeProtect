@@ -1,0 +1,1 @@
+Next.js 14 App Router with React 18, TypeScript 5.9, Tailwind CSS 3 + @tailwindcss/forms, Recharts for charts, Radix UI primitives (avatar, dialog, dropdown-menu, select, label, slot), Lucide icons, axios for HTTP, date-fns for dates, class-variance-authority + clsx + tailwind-merge for variant-driven styling.

@@ -1,0 +1,14 @@
+schema_version: 1
+module_path: ""
+title: SafeProtect Cameroon — Multi-Client Child Protection Platform
+scope:
+    - README.md
+    - package.json
+    - package-lock.json
+    - .gitignore
+    - docs/
+    - project_report.md
+    - final1 docx (Repaired).docx
+source_files: []
+depends_on: []
+related_to: []

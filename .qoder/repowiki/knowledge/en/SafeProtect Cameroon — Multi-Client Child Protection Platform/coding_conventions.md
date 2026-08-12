@@ -1,0 +1,2 @@
+- Each client configures its connection to the backend through an environment variable (`NEXT_PUBLIC_API_URL` / `EXPO_PUBLIC_API_URL`) rather than hard-coded URLs.
+- All cross-service requests are authenticated using the same JWT access/refresh token flow enforced by the backend's middleware, and both frontends enforce role-based views based on the decoded user role.

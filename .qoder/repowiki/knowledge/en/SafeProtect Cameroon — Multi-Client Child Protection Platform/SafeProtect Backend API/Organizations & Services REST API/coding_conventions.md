@@ -1,0 +1,6 @@
+- Each resource has a paired `routes/<resource>.ts` (route registration + middleware) and `controllers/<resource>.controller.ts` (Prisma queries) pattern.
+- Mutating routes are protected by composing the global `authenticate` middleware with route-scoped `authorize([...Role...])` guards.
+- Eager loading of related entities is centralized in module-level `*Include` objects reused across all queries via Prisma's `include`/`select`.
+- Controllers wrap all async database calls in try/catch blocks that return `{ error: 'Server error' }` with status 500 on exceptions.
+- 404 responses are returned explicitly as `{ error: '<Resource> not found' }` when a lookup by id yields no record.
+- Ownership checks for ORGANIZATION-role users are enforced inside the controller by resolving the user's organization and comparing it against the target resource's `organizationId`.

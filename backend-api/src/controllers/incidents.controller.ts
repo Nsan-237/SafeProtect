@@ -14,8 +14,6 @@ const incidentInclude = {
     include: {
       assignedWorker: { include: { user: { select: { name: true } } } },
     },
-    orderBy: { createdAt: 'desc' as const },
-    take: 1,
   },
 };
 
@@ -80,7 +78,6 @@ export const getAll = async (req: Request, res: Response) => {
     });
     res.json(incidents);
   } catch (err) {
-    console.error('Incident getAll error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -94,7 +91,6 @@ export const getById = async (req: Request, res: Response) => {
     if (!incident) return res.status(404).json({ error: 'Incident not found' });
     res.json(incident);
   } catch (err) {
-    console.error('Incident getById error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -108,41 +104,34 @@ export const getByVictim = async (req: Request, res: Response) => {
     });
     res.json(incidents);
   } catch (err) {
-    console.error('Incident getByVictim error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 };
 
-export const update = async (req: AuthRequest, res: Response) => {
+export const update = async (req: Request, res: Response) => {
   try {
-    const { category, description, location, date, riskLevel } = req.body;
-    const data: any = {};
-    if (category) data.category = category;
-    if (description) data.description = description;
-    if (location) data.location = location;
-    if (date) data.date = new Date(date);
-    if (riskLevel) data.riskLevel = riskLevel;
-
     const incident = await prisma.incident.update({
       where: { id: req.params.id },
-      data,
+      data: req.body,
       include: incidentInclude,
     });
     res.json(incident);
   } catch (err) {
-    console.error('Incident update error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 };
 
-export const remove = async (req: AuthRequest, res: Response) => {
+export const remove = async (req: Request, res: Response) => {
   try {
-    // Delete linked cases first (FK constraint)
-    await prisma.case.deleteMany({ where: { incidentId: req.params.id } });
-    await prisma.incident.delete({ where: { id: req.params.id } });
+    await prisma.case.deleteMany({
+      where: { incidentId: req.params.id },
+    });
+    await prisma.incident.delete({
+      where: { id: req.params.id },
+    });
     res.json({ message: 'Incident deleted' });
   } catch (err) {
-    console.error('Incident delete error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 };
+

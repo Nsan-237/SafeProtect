@@ -1,0 +1,1 @@
+Run with `npm run dev` / `npm run build` / `npm run start` (scripts in `package.json`). The backend URL defaults to `http://localhost:5000/api` unless overridden by the `NEXT_PUBLIC_API_URL` environment variable; copy `.env.example` to `.env.local` to configure it. A separate `.env.local` file is already present in the module scope.

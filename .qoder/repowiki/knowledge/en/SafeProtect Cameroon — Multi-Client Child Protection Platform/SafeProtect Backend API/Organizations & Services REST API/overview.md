@@ -1,0 +1,1 @@
+Express routes and controllers exposing CRUD endpoints for organizations and their services, backed by Prisma with role-based access control.

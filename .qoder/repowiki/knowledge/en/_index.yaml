@@ -1,0 +1,83 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: en-US
+branch: main
+nodes_managed: true
+exported_at: "2026-08-12T13:39:58Z"
+modules:
+    "":
+        dir_name: SafeProtect Cameroon — Multi-Client Child Protection Platform
+        title: SafeProtect Cameroon — Multi-Client Child Protection Platform
+        scope:
+            - README.md
+            - package.json
+            - package-lock.json
+            - .gitignore
+            - docs/
+            - project_report.md
+            - final1 docx (Repaired).docx
+        source_files: []
+        children:
+            - backend_api
+            - mobile_app
+            - web_dashboard
+        depends_on: []
+        related_to: []
+    backend_api:
+        dir_name: SafeProtect Backend API
+        title: SafeProtect Backend API
+        scope:
+            - backend-api/
+        source_files: []
+        children:
+            - backend_api/auth_users
+            - backend_api/organizations_services
+        depends_on: []
+        related_to: []
+    backend_api/auth_users:
+        dir_name: Authentication & User Registration
+        title: Authentication & User Registration
+        scope:
+            - backend-api/src/controllers/auth.controller.ts
+            - backend-api/src/routes/auth.routes.ts
+            - backend-api/src/middleware/auth.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: mobile_app
+            - path: web_dashboard
+    backend_api/organizations_services:
+        dir_name: Organizations & Services REST API
+        title: Organizations & Services REST API
+        scope:
+            - backend-api/src/controllers/organizations.controller.ts
+            - backend-api/src/routes/organizations.routes.ts
+            - backend-api/src/controllers/services.controller.ts
+            - backend-api/src/routes/services.routes.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: web_dashboard
+    mobile_app:
+        dir_name: SafeProtect Mobile App (Expo_React Native)
+        title: SafeProtect Mobile App (Expo/React Native)
+        scope:
+            - mobile-app/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_api/auth_users
+    web_dashboard:
+        dir_name: SafeProtect Admin Web Dashboard
+        title: SafeProtect Admin Web Dashboard
+        scope:
+            - web-dashboard/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend_api/auth_users
+            - path: backend_api/organizations_services

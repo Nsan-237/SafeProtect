@@ -1,0 +1,1 @@
+Express.js with TypeScript, Prisma ORM for PostgreSQL, helmet/cors/express-rate-limit for security and resilience, and multer-style upload middleware for file handling.
