@@ -1,7 +1,7 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { HomeScreen } from "../screens/victim/HomeScreen";
-import { CaseListScreen } from "../screens/victim/CaseListScreen";
+import { AppointmentsScreen } from "../screens/victim/AppointmentsScreen";
 import { EmergencySOSScreen } from "../screens/victim/EmergencySOSScreen";
 import { ServicesScreen } from "../screens/victim/ServicesScreen";
 import { ProfileScreen } from "../screens/victim/ProfileScreen";
@@ -15,7 +15,7 @@ export const VictimTabs = () => (
     tabBar={(props) => <CustomTabBar {...props} />}
   >
     <Tab.Screen name="Home" component={HomeScreen} />
-    <Tab.Screen name="Reports" component={CaseListScreen} />
+    <Tab.Screen name="Appointments" component={AppointmentsScreen} />
     <Tab.Screen name="SOS" component={EmergencySOSScreen} />
     <Tab.Screen name="Services" component={ServicesScreen} />
     <Tab.Screen name="Profile" component={ProfileScreen} />

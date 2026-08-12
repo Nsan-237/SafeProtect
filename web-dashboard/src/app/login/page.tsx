@@ -31,6 +31,7 @@ export default function Login() {
       localStorage.setItem('@user', JSON.stringify(user));
       localStorage.setItem('@token', tokens.accessToken);
       localStorage.setItem('@refreshToken', tokens.refreshToken);
+      document.cookie = `accessToken=${tokens.accessToken};path=/;max-age=86400`;
 
       router.push('/dashboard');
     } catch (err: any) {

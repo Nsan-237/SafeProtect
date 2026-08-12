@@ -8,6 +8,8 @@ import { SocialWorkerTabs } from "./SocialWorkerTabs";
 import { CaseDetailScreen } from "../screens/victim/CaseDetailScreen";
 import { ReportIncidentScreen } from "../screens/victim/ReportIncidentScreen";
 import { ChatScreen } from "../screens/victim/ChatScreen";
+import { MessagesScreen } from "../screens/victim/MessagesScreen";
+import { CaseListScreen } from "../screens/victim/CaseListScreen";
 import { SWCaseDetailScreen } from "../screens/socialworker/SWCaseDetailScreen";
 import { View, ActivityIndicator } from "react-native";
 
@@ -17,6 +19,8 @@ const VictimStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="VictimTabs" component={VictimTabs} />
     <Stack.Screen name="Chat" component={ChatScreen} />
+    <Stack.Screen name="Messages" component={MessagesScreen} />
+    <Stack.Screen name="CaseList" component={CaseListScreen} />
     <Stack.Screen name="CaseDetail" component={CaseDetailScreen} />
     <Stack.Screen name="ReportIncident" component={ReportIncidentScreen} />
   </Stack.Navigator>

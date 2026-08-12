@@ -16,5 +16,7 @@ router.get(
 );
 router.get("/victim/:victimId", incidentsController.getByVictim);
 router.get("/:id", incidentsController.getById);
+router.put('/:id', authorize([Role.ADMIN, Role.SOCIAL_WORKER]), incidentsController.update);
+router.delete('/:id', authorize([Role.ADMIN]), incidentsController.remove);
 
 export default router;

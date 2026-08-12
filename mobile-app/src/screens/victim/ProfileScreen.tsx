@@ -1,16 +1,22 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  Image,
   StatusBar,
+  Modal,
+  TextInput,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../hooks/useAuth";
 import { Ionicons } from "@expo/vector-icons";
+import api from "../../services/api";
 
 const ROLE_LABEL: Record<string, string> = {
   VICTIM: "Victim",
@@ -19,28 +25,292 @@ const ROLE_LABEL: Record<string, string> = {
   ORGANIZATION: "Organization",
 };
 
+// ────────────────────────────────────────────────────────────────
+// Sub-modals
+// ────────────────────────────────────────────────────────────────
+
+const PersonalInfoModal = ({
+  visible,
+  user,
+  onClose,
+  onSaved,
+}: {
+  visible: boolean;
+  user: any;
+  onClose: () => void;
+  onSaved: (name: string, phone: string) => void;
+}) => {
+  const [name, setName] = useState(user?.name ?? "");
+  const [phone, setPhone] = useState(user?.phone ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      Alert.alert("Validation", "Name cannot be empty.");
+      return;
+    }
+    try {
+      setSaving(true);
+      await api.put(`/users/${user?.id}`, { name: name.trim(), phone: phone.trim() });
+      Alert.alert("✅ Saved", "Your profile has been updated.");
+      onSaved(name.trim(), phone.trim());
+      onClose();
+    } catch (e: any) {
+      Alert.alert("Error", e?.response?.data?.error ?? "Failed to save profile.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
+          activeOpacity={1}
+          onPress={onClose}
+        >
+          <View
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 24,
+            }}
+            // prevent tap-through
+            onStartShouldSetResponder={() => true}
+          >
+            <Text style={{ fontSize: 18, fontWeight: "800", color: "#1E1E2D", marginBottom: 20 }}>
+              Personal Information
+            </Text>
+
+            <Text style={{ fontSize: 12, fontWeight: "700", color: "#75759E", marginBottom: 6, textTransform: "uppercase" }}>Full Name</Text>
+            <TextInput
+              style={{
+                backgroundColor: "#F8F9FE",
+                borderWidth: 1.5,
+                borderColor: "#E8E8F0",
+                borderRadius: 12,
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                fontSize: 15,
+                color: "#1E1E2D",
+                marginBottom: 16,
+              }}
+              value={name}
+              onChangeText={setName}
+              placeholder="Your full name"
+              placeholderTextColor="#A0A0B0"
+            />
+
+            <Text style={{ fontSize: 12, fontWeight: "700", color: "#75759E", marginBottom: 6, textTransform: "uppercase" }}>Phone Number</Text>
+            <TextInput
+              style={{
+                backgroundColor: "#F8F9FE",
+                borderWidth: 1.5,
+                borderColor: "#E8E8F0",
+                borderRadius: 12,
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                fontSize: 15,
+                color: "#1E1E2D",
+                marginBottom: 28,
+              }}
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="+237 6XX XXX XXX"
+              placeholderTextColor="#A0A0B0"
+              keyboardType="phone-pad"
+            />
+
+            <TouchableOpacity
+              onPress={handleSave}
+              disabled={saving}
+              style={{
+                backgroundColor: saving ? "#A0A0C0" : "#5B3FD3",
+                borderRadius: 14,
+                paddingVertical: 16,
+                alignItems: "center",
+                marginBottom: 12,
+              }}
+            >
+              {saving ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={{ color: "#FFF", fontSize: 15, fontWeight: "700" }}>Save Changes</Text>
+              )}
+            </TouchableOpacity>
+            <View style={{ height: 8 }} />
+          </View>
+        </TouchableOpacity>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+};
+
+const ChangePasswordModal = ({
+  visible,
+  userId,
+  onClose,
+}: {
+  visible: boolean;
+  userId?: string;
+  onClose: () => void;
+}) => {
+  const [current, setCurrent] = useState("");
+  const [newPass, setNewPass] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleChange = async () => {
+    if (!current || !newPass || !confirm) {
+      Alert.alert("Validation", "Please fill all fields.");
+      return;
+    }
+    if (newPass !== confirm) {
+      Alert.alert("Validation", "New password and confirmation do not match.");
+      return;
+    }
+    if (newPass.length < 6) {
+      Alert.alert("Validation", "Password must be at least 6 characters.");
+      return;
+    }
+    try {
+      setSaving(true);
+      await api.put(`/users/${userId}`, { currentPassword: current, password: newPass });
+      Alert.alert("✅ Changed", "Password updated successfully.");
+      setCurrent(""); setNewPass(""); setConfirm("");
+      onClose();
+    } catch (e: any) {
+      Alert.alert("Error", e?.response?.data?.error ?? "Failed to change password.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
+          activeOpacity={1}
+          onPress={onClose}
+        >
+          <View
+            style={{ backgroundColor: "#FFFFFF", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 }}
+            onStartShouldSetResponder={() => true}
+          >
+            <Text style={{ fontSize: 18, fontWeight: "800", color: "#1E1E2D", marginBottom: 20 }}>
+              Change Password
+            </Text>
+
+            {[
+              { label: "Current Password", value: current, set: setCurrent },
+              { label: "New Password", value: newPass, set: setNewPass },
+              { label: "Confirm New Password", value: confirm, set: setConfirm },
+            ].map(({ label, value, set }) => (
+              <View key={label}>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: "#75759E", marginBottom: 6, textTransform: "uppercase" }}>{label}</Text>
+                <TextInput
+                  style={{
+                    backgroundColor: "#F8F9FE",
+                    borderWidth: 1.5,
+                    borderColor: "#E8E8F0",
+                    borderRadius: 12,
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    fontSize: 15,
+                    color: "#1E1E2D",
+                    marginBottom: 16,
+                  }}
+                  value={value}
+                  onChangeText={set}
+                  secureTextEntry
+                  placeholder="••••••••"
+                  placeholderTextColor="#A0A0B0"
+                />
+              </View>
+            ))}
+
+            <TouchableOpacity
+              onPress={handleChange}
+              disabled={saving}
+              style={{
+                backgroundColor: saving ? "#A0A0C0" : "#5B3FD3",
+                borderRadius: 14,
+                paddingVertical: 16,
+                alignItems: "center",
+                marginTop: 4,
+              }}
+            >
+              {saving ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={{ color: "#FFF", fontSize: 15, fontWeight: "700" }}>Update Password</Text>
+              )}
+            </TouchableOpacity>
+            <View style={{ height: 16 }} />
+          </View>
+        </TouchableOpacity>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+};
+
+// ────────────────────────────────────────────────────────────────
+// Main Profile Screen
+// ────────────────────────────────────────────────────────────────
+
 export const ProfileScreen = () => {
   const insets = useSafeAreaInsets();
-  const { logout, user } = useAuth();
+  const { logout, user, updateUser } = useAuth();
+
+  const [showPersonalInfo, setShowPersonalInfo] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   const displayName = user?.name ?? "My Profile";
   const displayRole = ROLE_LABEL[user?.role ?? ""] ?? user?.role ?? "";
 
-  const menuItems = [
-    { title: "Personal Information", icon: "person-outline" as const },
-    { title: "Change Password", icon: "key-outline" as const },
-    { title: "Notification Settings", icon: "notifications-outline" as const },
-    { title: "Privacy & Security", icon: "shield-checkmark-outline" as const },
-    { title: "Help & Support", icon: "help-circle-outline" as const },
-  ];
-
-  // Generate initials avatar for users without a photo
   const initials = displayName
     .split(" ")
     .map((n) => n[0])
     .join("")
     .toUpperCase()
     .slice(0, 2);
+
+  const menuItems = [
+    {
+      title: "Personal Information",
+      icon: "person-outline" as const,
+      onPress: () => setShowPersonalInfo(true),
+    },
+    {
+      title: "Change Password",
+      icon: "key-outline" as const,
+      onPress: () => setShowChangePassword(true),
+    },
+    {
+      title: "Notification Settings",
+      icon: "notifications-outline" as const,
+      onPress: () => Alert.alert("Coming Soon", "Notification preferences will be available in a future update."),
+    },
+    {
+      title: "Privacy & Security",
+      icon: "shield-checkmark-outline" as const,
+      onPress: () => Alert.alert("Privacy Policy", "Your data is protected under our privacy policy and government child protection regulations."),
+    },
+    {
+      title: "Help & Support",
+      icon: "help-circle-outline" as const,
+      onPress: () => Alert.alert("Help & Support", "Contact us at: support@safeprotect.cm\nHotline: +237 222 000 000"),
+    },
+  ];
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FE" }}>
@@ -63,7 +333,6 @@ export const ProfileScreen = () => {
             elevation: 10,
           }}
         >
-          {/* Avatar circle */}
           <View
             style={{
               width: 96,
@@ -77,47 +346,24 @@ export const ProfileScreen = () => {
               borderColor: "rgba(255,255,255,0.25)",
             }}
           >
-            <Text
-              style={{
-                fontSize: 32,
-                fontWeight: "800",
-                color: "#FFFFFF",
-                letterSpacing: 1,
-              }}
-            >
+            <Text style={{ fontSize: 32, fontWeight: "800", color: "#FFFFFF", letterSpacing: 1 }}>
               {initials}
             </Text>
           </View>
 
-          <Text
-            style={{
-              fontSize: 22,
-              fontWeight: "800",
-              color: "#FFFFFF",
-              textAlign: "center",
-              marginBottom: 4,
-            }}
-          >
+          <Text style={{ fontSize: 22, fontWeight: "800", color: "#FFFFFF", textAlign: "center", marginBottom: 4 }}>
             {displayName}
           </Text>
-          <View
-            style={{
-              backgroundColor: "rgba(91,63,211,0.5)",
-              paddingHorizontal: 14,
-              paddingVertical: 4,
-              borderRadius: 20,
-            }}
-          >
-            <Text
-              style={{
-                color: "rgba(255,255,255,0.9)",
-                fontSize: 12,
-                fontWeight: "700",
-              }}
-            >
+          <View style={{ backgroundColor: "rgba(91,63,211,0.5)", paddingHorizontal: 14, paddingVertical: 4, borderRadius: 20 }}>
+            <Text style={{ color: "rgba(255,255,255,0.9)", fontSize: 12, fontWeight: "700" }}>
               {displayRole}
             </Text>
           </View>
+          {user?.email && (
+            <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, marginTop: 6 }}>
+              {user.email}
+            </Text>
+          )}
         </View>
 
         <View style={{ padding: 20, paddingTop: 24 }}>
@@ -140,6 +386,7 @@ export const ProfileScreen = () => {
             {menuItems.map((item, index) => (
               <TouchableOpacity
                 key={index}
+                onPress={item.onPress}
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
@@ -162,14 +409,7 @@ export const ProfileScreen = () => {
                 >
                   <Ionicons name={item.icon} size={20} color="#5B3FD3" />
                 </View>
-                <Text
-                  style={{
-                    flex: 1,
-                    fontSize: 15,
-                    fontWeight: "600",
-                    color: "#1E1E2D",
-                  }}
-                >
+                <Text style={{ flex: 1, fontSize: 15, fontWeight: "600", color: "#1E1E2D" }}>
                   {item.title}
                 </Text>
                 <Ionicons name="chevron-forward" size={18} color="#B0B0C8" />
@@ -198,19 +438,27 @@ export const ProfileScreen = () => {
             activeOpacity={0.8}
           >
             <Ionicons name="log-out-outline" size={22} color="#FF2E55" />
-            <Text
-              style={{
-                color: "#FF2E55",
-                fontWeight: "800",
-                fontSize: 15,
-                marginLeft: 8,
-              }}
-            >
+            <Text style={{ color: "#FF2E55", fontWeight: "800", fontSize: 15, marginLeft: 8 }}>
               Logout
             </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Modals */}
+      <PersonalInfoModal
+        visible={showPersonalInfo}
+        user={user}
+        onClose={() => setShowPersonalInfo(false)}
+        onSaved={(name, phone) => {
+          updateUser({ name, phone });
+        }}
+      />
+      <ChangePasswordModal
+        visible={showChangePassword}
+        userId={user?.id}
+        onClose={() => setShowChangePassword(false)}
+      />
     </SafeAreaView>
   );
 };

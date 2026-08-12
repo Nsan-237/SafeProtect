@@ -62,19 +62,9 @@ export const HomeScreen = ({ navigation }: any) => {
         }
       };
 
-      let filteredCases = allCases;
-      if (user?.role === "VICTIM" && user?.victimProfile?.id) {
-        filteredCases = allCases.filter(
-          (c: any) => c.incident?.victimId === user.victimProfile?.id,
-        );
-      } else if (
-        user?.role === "SOCIAL_WORKER" &&
-        user?.socialWorkerProfile?.id
-      ) {
-        filteredCases = allCases.filter(
-          (c: any) => c.assignedWorkerId === user.socialWorkerProfile?.id,
-        );
-      }
+      // Backend already scopes cases by role (getCaseScope in cases.controller.ts)
+      // No client-side filtering needed
+      const filteredCases = allCases;
 
       const mapPriority = (priority: string) => {
         switch (priority) {

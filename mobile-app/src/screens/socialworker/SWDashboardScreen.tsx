@@ -61,10 +61,8 @@ export const SWDashboardScreen = ({ navigation }: any) => {
         }
       };
 
-      const swId = user?.socialWorkerProfile?.id;
-      const filteredCases = swId
-        ? allCases.filter((c: any) => c.assignedWorkerId === swId)
-        : allCases;
+      // Backend GET /cases already scopes by the authenticated user's role
+      const filteredCases = allCases;
 
       const mapPriority = (priority: string) => {
         switch (priority) {

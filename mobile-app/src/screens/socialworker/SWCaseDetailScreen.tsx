@@ -9,25 +9,26 @@ import {
   StatusBar,
   ActivityIndicator,
   Alert,
+  Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 
-const STATUS_OPTIONS = ["New", "In Progress", "Resolved", "Closed"];
+const STATUS_OPTIONS = ["New", "In Progress", "Support Provided", "Resolved", "Closed"];
 
 const STATUS_TO_API: Record<string, string> = {
   New: "NEW",
   "In Progress": "UNDER_INVESTIGATION",
+  "Support Provided": "SUPPORT_PROVIDED",
   Resolved: "RESOLVED",
   Closed: "CLOSED",
 };
 
-const WORKER_OPTIONS = [
-  "Aline Ndey (Social Worker)",
-  "Eric Tchana (Social Worker)",
-  "Unassigned",
-];
+interface Worker {
+  id: string;
+  user: { name: string };
+}
 
 export const SWCaseDetailScreen = ({ navigation, route }: any) => {
   const insets = useSafeAreaInsets();
@@ -36,16 +37,16 @@ export const SWCaseDetailScreen = ({ navigation, route }: any) => {
   const [caseData, setCaseData] = useState<any>(null);
   const [caseNumber, setCaseNumber] = useState("");
   const [status, setStatus] = useState("In Progress");
-  const [assignee, setAssignee] = useState("Aline Ndey (Social Worker)");
+  const [assignedWorkerId, setAssignedWorkerId] = useState<string>("");
+  const [assigneeName, setAssigneeName] = useState("Unassigned");
+  const [workers, setWorkers] = useState<Worker[]>([]);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showAssigneePicker, setShowAssigneePicker] = useState(false);
   const [notes, setNotes] = useState("");
-  const [followUpDate, setFollowUpDate] = useState("07/06/2024");
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Load existing case data
+  // Load case data and workers list in parallel
   useEffect(() => {
     if (!caseId) {
       setLoading(false);
@@ -53,22 +54,29 @@ export const SWCaseDetailScreen = ({ navigation, route }: any) => {
     }
     const load = async () => {
       try {
-        const res = await api.get(`/cases/${caseId}`);
-        const c = res.data;
+        const [caseRes, workersRes] = await Promise.all([
+          api.get(`/cases/${caseId}`),
+          api.get("/social-workers"),
+        ]);
+
+        const c = caseRes.data;
         setCaseData(c);
-        setCaseNumber(c.caseNumber ?? "SPC-2026-00001");
+        setCaseNumber(c.caseNumber ?? "");
 
         const displayStatus =
           Object.entries(STATUS_TO_API).find(([, v]) => v === c.status)?.[0] ??
           "In Progress";
         setStatus(displayStatus);
-        setNotes(
-          c.notes ??
-            "Initial assessment done. Patient referred for medical examination and counseling.",
-        );
-        if (c.assignedWorker?.user?.name) {
-          setAssignee(`${c.assignedWorker.user.name} (Social Worker)`);
+        setNotes(c.notes ?? "");
+
+        if (c.assignedWorkerId) {
+          setAssignedWorkerId(c.assignedWorkerId);
         }
+        if (c.assignedWorker?.user?.name) {
+          setAssigneeName(c.assignedWorker.user.name);
+        }
+
+        setWorkers(workersRes.data);
       } catch (e: any) {
         Alert.alert(
           "Error",
@@ -81,6 +89,21 @@ export const SWCaseDetailScreen = ({ navigation, route }: any) => {
     };
     load();
   }, [caseId]);
+
+  const handleReassign = async (worker: Worker) => {
+    setShowAssigneePicker(false);
+    try {
+      setSaving(true);
+      await api.put(`/cases/${caseId}/assign`, { workerId: worker.id });
+      setAssignedWorkerId(worker.id);
+      setAssigneeName(worker.user.name);
+      Alert.alert("✅ Reassigned", `Case reassigned to ${worker.user.name}`);
+    } catch (e: any) {
+      Alert.alert("Error", e?.response?.data?.error ?? "Failed to reassign case.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleSave = async () => {
     try {
@@ -103,8 +126,6 @@ export const SWCaseDetailScreen = ({ navigation, route }: any) => {
       setSaving(false);
     }
   };
-
-  const quickDates = ["07/06/2024", "14/06/2024", "21/06/2024", "30/06/2024"];
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FE" }}>
@@ -140,9 +161,7 @@ export const SWCaseDetailScreen = ({ navigation, route }: any) => {
       </View>
 
       {loading ? (
-        <View
-          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
-        >
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
           <ActivityIndicator size="large" color="#5B3FD3" />
           <Text style={{ marginTop: 12, color: "#75759E" }}>
             Loading case details...
@@ -151,426 +170,228 @@ export const SWCaseDetailScreen = ({ navigation, route }: any) => {
       ) : (
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+          contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Incident Context Banner */}
+          {/* Incident context */}
           {caseData && (
             <View
               style={{
-                backgroundColor: "#FFFFFF",
-                borderRadius: 16,
+                backgroundColor: "#F0EDFF",
+                borderRadius: 14,
                 padding: 16,
-                marginBottom: 20,
-                borderWidth: 1,
-                borderColor: "#F0F0F5",
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.04,
-                shadowRadius: 6,
-                elevation: 2,
+                marginBottom: 24,
+                borderLeftWidth: 4,
+                borderLeftColor: "#5B3FD3",
               }}
             >
-              <Text
-                style={{
-                  fontSize: 11,
-                  fontWeight: "700",
-                  color: "#75759E",
-                  textTransform: "uppercase",
-                  marginBottom: 4,
-                }}
-              >
-                Incident Summary
+              <Text style={{ fontSize: 11, fontWeight: "700", color: "#5B3FD3", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                Incident Details
               </Text>
-              <Text
-                style={{
-                  fontSize: 15,
-                  fontWeight: "800",
-                  color: "#1E1E2D",
-                  marginBottom: 2,
-                }}
-              >
-                {caseData.incident?.category?.replace("_", " ") ||
-                  "Domestic Violence"}
+              <Text style={{ fontSize: 15, fontWeight: "700", color: "#1E1E2D", marginBottom: 4 }}>
+                {caseData.incident?.category?.replace(/_/g, " ") ?? "N/A"}
               </Text>
-              <Text style={{ fontSize: 12, color: "#75759E" }}>
-                Location: {caseData.incident?.location || "Yaoundé, Mfoundi"} •
-                Reported:{" "}
-                {new Date(caseData.createdAt).toLocaleDateString("en-GB")}
+              <Text style={{ fontSize: 13, color: "#75759E" }}>
+                {caseData.incident?.location ?? "Location not provided"}
+              </Text>
+              <Text style={{ fontSize: 13, color: "#75759E", marginTop: 2 }}>
+                Victim: {caseData.incident?.victim?.user?.name ?? "Anonymous"}
               </Text>
             </View>
           )}
 
-          {/* Status Dropdown */}
-          <View style={{ marginBottom: 20 }}>
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "700",
-                color: "#75759E",
-                textTransform: "uppercase",
-                letterSpacing: 0.6,
-                marginBottom: 8,
-              }}
-            >
-              Status
-            </Text>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => setShowStatusPicker(!showStatusPicker)}
-              style={{
-                backgroundColor: "#FFFFFF",
-                padding: 16,
-                borderRadius: 14,
-                borderWidth: 1.5,
-                borderColor: showStatusPicker ? "#5B3FD3" : "#E8E8F0",
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.04,
-                shadowRadius: 6,
-                elevation: 2,
-              }}
-            >
-              <Text
-                style={{ fontSize: 15, fontWeight: "700", color: "#1E1E2D" }}
-              >
-                {status}
-              </Text>
-              <Ionicons
-                name={showStatusPicker ? "chevron-up" : "chevron-down"}
-                size={20}
-                color="#75759E"
-              />
-            </TouchableOpacity>
+          {/* Status Selector */}
+          <Text style={{ fontSize: 13, fontWeight: "700", color: "#1E1E2D", marginBottom: 8 }}>
+            Case Status
+          </Text>
+          <TouchableOpacity
+            onPress={() => setShowStatusPicker(true)}
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              backgroundColor: "#FFFFFF",
+              borderWidth: 1.5,
+              borderColor: "#E8E8F0",
+              borderRadius: 12,
+              paddingHorizontal: 16,
+              paddingVertical: 14,
+              marginBottom: 20,
+            }}
+          >
+            <Text style={{ fontSize: 15, color: "#1E1E2D", fontWeight: "600" }}>{status}</Text>
+            <Ionicons name="chevron-down" size={18} color="#75759E" />
+          </TouchableOpacity>
 
-            {showStatusPicker && (
-              <View
-                style={{
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: 14,
-                  borderWidth: 1,
-                  borderColor: "#E8E8F0",
-                  marginTop: 6,
-                  overflow: "hidden",
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.08,
-                  shadowRadius: 8,
-                  elevation: 4,
-                }}
-              >
-                {STATUS_OPTIONS.map((opt, i) => (
-                  <TouchableOpacity
-                    key={opt}
-                    onPress={() => {
-                      setStatus(opt);
-                      setShowStatusPicker(false);
-                    }}
-                    style={{
-                      padding: 14,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      borderBottomWidth:
-                        i !== STATUS_OPTIONS.length - 1 ? 1 : 0,
-                      borderBottomColor: "#F5F5F8",
-                      backgroundColor: status === opt ? "#F0EDFF" : "#FFFFFF",
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        fontWeight: "700",
-                        color: status === opt ? "#5B3FD3" : "#1E1E2D",
-                      }}
-                    >
-                      {opt}
-                    </Text>
-                    {status === opt && (
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={18}
-                        color="#5B3FD3"
-                      />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
+          {/* Assignee Selector */}
+          <Text style={{ fontSize: 13, fontWeight: "700", color: "#1E1E2D", marginBottom: 8 }}>
+            Assigned Social Worker
+          </Text>
+          <TouchableOpacity
+            onPress={() => setShowAssigneePicker(true)}
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              backgroundColor: "#FFFFFF",
+              borderWidth: 1.5,
+              borderColor: "#E8E8F0",
+              borderRadius: 12,
+              paddingHorizontal: 16,
+              paddingVertical: 14,
+              marginBottom: 20,
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Ionicons name="person-outline" size={18} color="#5B3FD3" />
+              <Text style={{ fontSize: 15, color: "#1E1E2D", fontWeight: "600" }}>{assigneeName}</Text>
+            </View>
+            <Ionicons name="chevron-down" size={18} color="#75759E" />
+          </TouchableOpacity>
 
-          {/* Assign To Dropdown (Matches Reference Image Screen 2) */}
-          <View style={{ marginBottom: 20 }}>
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "700",
-                color: "#75759E",
-                textTransform: "uppercase",
-                letterSpacing: 0.6,
-                marginBottom: 8,
-              }}
-            >
-              Assign To
-            </Text>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => setShowAssigneePicker(!showAssigneePicker)}
-              style={{
-                backgroundColor: "#FFFFFF",
-                padding: 16,
-                borderRadius: 14,
-                borderWidth: 1.5,
-                borderColor: showAssigneePicker ? "#5B3FD3" : "#E8E8F0",
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.04,
-                shadowRadius: 6,
-                elevation: 2,
-              }}
-            >
-              <Text
-                style={{ fontSize: 15, fontWeight: "600", color: "#1E1E2D" }}
-              >
-                {assignee}
-              </Text>
-              <Ionicons
-                name={showAssigneePicker ? "chevron-up" : "chevron-down"}
-                size={20}
-                color="#75759E"
-              />
-            </TouchableOpacity>
+          {/* Notes */}
+          <Text style={{ fontSize: 13, fontWeight: "700", color: "#1E1E2D", marginBottom: 8 }}>
+            Case Notes
+          </Text>
+          <TextInput
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderWidth: 1.5,
+              borderColor: "#E8E8F0",
+              borderRadius: 12,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              fontSize: 14,
+              color: "#1E1E2D",
+              minHeight: 120,
+              textAlignVertical: "top",
+              marginBottom: 32,
+            }}
+            placeholder="Add progress notes, observations, or next steps..."
+            placeholderTextColor="#A0A0B0"
+            multiline
+            numberOfLines={5}
+            value={notes}
+            onChangeText={setNotes}
+          />
 
-            {showAssigneePicker && (
-              <View
-                style={{
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: 14,
-                  borderWidth: 1,
-                  borderColor: "#E8E8F0",
-                  marginTop: 6,
-                  overflow: "hidden",
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.08,
-                  shadowRadius: 8,
-                  elevation: 4,
-                }}
-              >
-                {WORKER_OPTIONS.map((w, i) => (
-                  <TouchableOpacity
-                    key={w}
-                    onPress={() => {
-                      setAssignee(w);
-                      setShowAssigneePicker(false);
-                    }}
-                    style={{
-                      padding: 14,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      borderBottomWidth:
-                        i !== WORKER_OPTIONS.length - 1 ? 1 : 0,
-                      borderBottomColor: "#F5F5F8",
-                      backgroundColor: assignee === w ? "#F0EDFF" : "#FFFFFF",
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        fontWeight: "600",
-                        color: assignee === w ? "#5B3FD3" : "#1E1E2D",
-                      }}
-                    >
-                      {w}
-                    </Text>
-                    {assignee === w && (
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={18}
-                        color="#5B3FD3"
-                      />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-
-          {/* Case Notes Multiline Input */}
-          <View style={{ marginBottom: 20 }}>
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "700",
-                color: "#75759E",
-                textTransform: "uppercase",
-                letterSpacing: 0.6,
-                marginBottom: 8,
-              }}
-            >
-              Case Notes
-            </Text>
-            <TextInput
-              style={{
-                backgroundColor: "#FFFFFF",
-                padding: 16,
-                borderRadius: 14,
-                borderWidth: 1.5,
-                borderColor: "#E8E8F0",
-                fontSize: 14,
-                color: "#1E1E2D",
-                minHeight: 120,
-                lineHeight: 20,
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.04,
-                shadowRadius: 6,
-                elevation: 2,
-              }}
-              multiline
-              textAlignVertical="top"
-              placeholder="Initial assessment done. Patient referred for medical examination and counseling."
-              placeholderTextColor="#B0B0C8"
-              value={notes}
-              onChangeText={setNotes}
-            />
-          </View>
-
-          {/* Next Action / Follow-up Date */}
-          <View style={{ marginBottom: 32 }}>
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "700",
-                color: "#75759E",
-                textTransform: "uppercase",
-                letterSpacing: 0.6,
-                marginBottom: 8,
-              }}
-            >
-              Next Action / Follow-up
-            </Text>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => setShowDatePicker(!showDatePicker)}
-              style={{
-                backgroundColor: "#FFFFFF",
-                padding: 16,
-                borderRadius: 14,
-                borderWidth: 1.5,
-                borderColor: showDatePicker ? "#5B3FD3" : "#E8E8F0",
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.04,
-                shadowRadius: 6,
-                elevation: 2,
-              }}
-            >
-              <Text
-                style={{ fontSize: 15, fontWeight: "600", color: "#1E1E2D" }}
-              >
-                {followUpDate || "07/06/2024"}
-              </Text>
-              <Ionicons name="calendar-outline" size={20} color="#75759E" />
-            </TouchableOpacity>
-
-            {showDatePicker && (
-              <View
-                style={{
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: 14,
-                  borderWidth: 1,
-                  borderColor: "#E8E8F0",
-                  marginTop: 6,
-                  padding: 14,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: "700",
-                    color: "#75759E",
-                    marginBottom: 10,
-                  }}
-                >
-                  Select Date:
-                </Text>
-                <View
-                  style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}
-                >
-                  {quickDates.map((d) => (
-                    <TouchableOpacity
-                      key={d}
-                      onPress={() => {
-                        setFollowUpDate(d);
-                        setShowDatePicker(false);
-                      }}
-                      style={{
-                        backgroundColor:
-                          followUpDate === d ? "#5B3FD3" : "#F0F0F5",
-                        paddingHorizontal: 14,
-                        paddingVertical: 8,
-                        borderRadius: 10,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: followUpDate === d ? "#FFFFFF" : "#1E1E2D",
-                          fontSize: 13,
-                          fontWeight: "700",
-                        }}
-                      >
-                        {d}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            )}
-          </View>
-
-          {/* Save Changes Button */}
+          {/* Save Button */}
           <TouchableOpacity
             onPress={handleSave}
             disabled={saving}
-            activeOpacity={0.85}
             style={{
-              backgroundColor: saving ? "#8B6FF7" : "#5B3FD3",
-              paddingVertical: 16,
+              backgroundColor: saving ? "#A0A0C0" : "#5B3FD3",
               borderRadius: 14,
+              paddingVertical: 16,
               alignItems: "center",
-              justifyContent: "center",
-              flexDirection: "row",
               shadowColor: "#5B3FD3",
               shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.35,
-              shadowRadius: 10,
-              elevation: 6,
+              shadowOpacity: 0.25,
+              shadowRadius: 8,
+              elevation: 4,
             }}
           >
             {saving ? (
-              <ActivityIndicator
-                size="small"
-                color="#FFF"
-                style={{ marginRight: 8 }}
-              />
-            ) : null}
-            <Text style={{ color: "#FFFFFF", fontWeight: "800", fontSize: 16 }}>
-              {saving ? "Saving Changes..." : "Save Changes"}
-            </Text>
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={{ color: "#FFFFFF", fontSize: 16, fontWeight: "700" }}>
+                Save Changes
+              </Text>
+            )}
           </TouchableOpacity>
         </ScrollView>
       )}
+
+      {/* Status Picker Modal */}
+      <Modal
+        visible={showStatusPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowStatusPicker(false)}
+      >
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
+          activeOpacity={1}
+          onPress={() => setShowStatusPicker(false)}
+        >
+          <View style={{ backgroundColor: "#FFFFFF", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 }}>
+            <Text style={{ fontSize: 16, fontWeight: "800", color: "#1E1E2D", marginBottom: 16 }}>
+              Select Status
+            </Text>
+            {STATUS_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt}
+                onPress={() => { setStatus(opt); setShowStatusPicker(false); }}
+                style={{
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  borderRadius: 12,
+                  backgroundColor: status === opt ? "#F0EDFF" : "transparent",
+                  marginBottom: 4,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Text style={{ fontSize: 15, color: status === opt ? "#5B3FD3" : "#1E1E2D", fontWeight: status === opt ? "700" : "500" }}>
+                  {opt}
+                </Text>
+                {status === opt && <Ionicons name="checkmark-circle" size={20} color="#5B3FD3" />}
+              </TouchableOpacity>
+            ))}
+            <View style={{ height: 20 }} />
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Assignee Picker Modal */}
+      <Modal
+        visible={showAssigneePicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAssigneePicker(false)}
+      >
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
+          activeOpacity={1}
+          onPress={() => setShowAssigneePicker(false)}
+        >
+          <View style={{ backgroundColor: "#FFFFFF", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 }}>
+            <Text style={{ fontSize: 16, fontWeight: "800", color: "#1E1E2D", marginBottom: 16 }}>
+              Reassign Case
+            </Text>
+            {workers.map((w) => (
+              <TouchableOpacity
+                key={w.id}
+                onPress={() => handleReassign(w)}
+                style={{
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  borderRadius: 12,
+                  backgroundColor: assignedWorkerId === w.id ? "#F0EDFF" : "transparent",
+                  marginBottom: 4,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "#F0EDFF", alignItems: "center", justifyContent: "center" }}>
+                    <Text style={{ fontSize: 14, fontWeight: "800", color: "#5B3FD3" }}>
+                      {w.user.name.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 15, color: assignedWorkerId === w.id ? "#5B3FD3" : "#1E1E2D", fontWeight: assignedWorkerId === w.id ? "700" : "500" }}>
+                    {w.user.name}
+                  </Text>
+                </View>
+                {assignedWorkerId === w.id && <Ionicons name="checkmark-circle" size={20} color="#5B3FD3" />}
+              </TouchableOpacity>
+            ))}
+            <View style={{ height: 20 }} />
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -41,10 +41,10 @@ export const ChatScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(!!receiverId);
   const [sending, setSending] = useState(false);
 
-  const fetchMessages = useCallback(async () => {
+  const fetchMessages = useCallback(async (silent = false) => {
     if (!receiverId) return;
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const res = await api.get(`/messages/${receiverId}`);
       const mapped: Message[] = res.data.map((m: any) => ({
         id: m.id,
@@ -56,13 +56,16 @@ export const ChatScreen = ({ navigation }: any) => {
     } catch (err) {
       console.warn("Error fetching messages:", err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [receiverId, user]);
 
   useFocusEffect(
     useCallback(() => {
       fetchMessages();
+      // Poll every 8 seconds while screen is focused
+      const interval = setInterval(() => fetchMessages(true), 8000);
+      return () => clearInterval(interval); // cleanup on blur/unmount
     }, [fetchMessages]),
   );
 

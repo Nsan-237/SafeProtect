@@ -14,5 +14,6 @@ router.put('/:id/assign', authorize([Role.ADMIN]), casesController.assign);
 router.put('/:id/status', authorize([Role.ADMIN, Role.SOCIAL_WORKER]), casesController.updateStatus);
 router.patch('/:id', authorize([Role.ADMIN, Role.SOCIAL_WORKER]), casesController.updateCase);
 router.post('/:id/notes', authorize([Role.ADMIN, Role.SOCIAL_WORKER]), casesController.addNote);
+router.delete('/:id', authorize([Role.ADMIN]), casesController.deleteCase);
 
 export default router;

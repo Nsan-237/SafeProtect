@@ -65,19 +65,8 @@ export const CaseListScreen = ({ navigation }: any) => {
         }
       };
 
-      let filteredCases = allCases;
-      if (user?.role === "VICTIM" && user?.victimProfile?.id) {
-        filteredCases = allCases.filter(
-          (c: any) => c.incident?.victimId === user.victimProfile?.id,
-        );
-      } else if (
-        user?.role === "SOCIAL_WORKER" &&
-        user?.socialWorkerProfile?.id
-      ) {
-        filteredCases = allCases.filter(
-          (c: any) => c.assignedWorkerId === user.socialWorkerProfile?.id,
-        );
-      }
+      // Backend GET /cases already scopes results by authenticated user role
+      const filteredCases = allCases;
 
       const mapPriority = (priority: string) => {
         switch (priority) {
