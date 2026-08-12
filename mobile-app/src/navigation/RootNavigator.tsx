@@ -13,6 +13,8 @@ import { CaseListScreen } from "../screens/victim/CaseListScreen";
 import { SWCaseDetailScreen } from "../screens/socialworker/SWCaseDetailScreen";
 import { View, ActivityIndicator } from "react-native";
 
+import { EmergencySOSScreen } from "../screens/victim/EmergencySOSScreen";
+
 const Stack = createStackNavigator();
 
 const VictimStack = () => (
@@ -23,8 +25,10 @@ const VictimStack = () => (
     <Stack.Screen name="CaseList" component={CaseListScreen} />
     <Stack.Screen name="CaseDetail" component={CaseDetailScreen} />
     <Stack.Screen name="ReportIncident" component={ReportIncidentScreen} />
+    <Stack.Screen name="EmergencySOS" component={EmergencySOSScreen} />
   </Stack.Navigator>
 );
+
 
 const SocialWorkerStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>

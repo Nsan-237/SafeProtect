@@ -10,8 +10,10 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../hooks/useAuth";
 import api from "../../services/api";
+
 
 interface Thread {
   id: string;
@@ -36,6 +38,7 @@ const formatTime = (dateStr: string) => {
 
 export const MessagesScreen = ({ navigation }: any) => {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [threads, setThreads] = useState<Thread[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -83,7 +86,7 @@ export const MessagesScreen = ({ navigation }: any) => {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8F9FE" }}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle="dark-content" backgroundColor="#F8F9FE" />
 
       {/* Header */}
       <View
@@ -92,24 +95,21 @@ export const MessagesScreen = ({ navigation }: any) => {
           alignItems: "center",
           justifyContent: "space-between",
           paddingHorizontal: 20,
-          paddingVertical: 16,
+          paddingTop: (insets.top || StatusBar.currentHeight || 24) + 8,
+          paddingBottom: 14,
           backgroundColor: "#FFFFFF",
           borderBottomWidth: 1,
           borderBottomColor: "#F0F0F5",
         }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <TouchableOpacity onPress={() => navigation?.goBack()} style={{ padding: 4, marginLeft: -4 }}>
-            <Ionicons name="arrow-back" size={24} color="#1E1E2D" />
-          </TouchableOpacity>
-          <Text style={{ fontSize: 18, fontWeight: "800", color: "#1E1E2D", marginLeft: 12 }}>
-            Messages
-          </Text>
-        </View>
+        <Text style={{ fontSize: 22, fontWeight: "800", color: "#1E1E2D" }}>
+          Messages
+        </Text>
         <TouchableOpacity style={{ padding: 4 }}>
           <Ionicons name="create-outline" size={22} color="#5B3FD3" />
         </TouchableOpacity>
       </View>
+
 
       {loading ? (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
